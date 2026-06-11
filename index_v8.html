@@ -65,7 +65,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .action-btn.danger { color: #A32D2D; background: #FCEBEB; }
 .action-btn.muted { color: #555; background: #f0f0ea; }
 .action-btn.freeroll { color: #7A4F00; background: #FEF3E2; }
-.write-status { font-size: 10px; margin-top: 6px; color: #aaa; }
+.confirm-cancel-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; padding: 8px 10px; background: #FCEBEB; border-radius: 8px; }
 .checkin-body { border-top: 1px solid #f0f0ea; padding: 12px 14px; background: #fafaf7; }
 .q-block { margin-bottom: 14px; }
 .q-label { font-size: 13px; color: #555; margin-bottom: 6px; }
@@ -244,7 +244,7 @@ var DAY_NAMES  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','S
 var DAY_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={};
+var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
 var TASKS=[], questions=[], rules=[];
 var viewMode='today', selectedDays=[];
 var CHECKIN_TASK_PERIOD = {'TASK_001':'morning','TASK_002':'midday','TASK_003':'evening'};
@@ -484,14 +484,29 @@ function renderTask(t){
     if (isCheckin){exp=renderCheckinBody(t);}
     else{
       var note=t.note?'<div class="task-note-text">'+t.note+'</div>':'';
-      // Cancel button available for ALL tasks, but with confirmation for Apt/Med
-      var cancelLabel = requiresConfirmToCancel(t) ? 'Cancel*' : 'Cancel';
-      exp='<div class="task-expanded">'+note+'<div class="action-row">'
-        +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
-        +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
-        +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">'+cancelLabel+'</button>'
-        +'</div>'
-        +(requiresConfirmToCancel(t)?'<div class="write-status">* Requires confirmation</div>':'')
+      var needsConfirm = requiresConfirmToCancel(t);
+      var cancelPending = pendingCancel[t.id];
+      var actionRow, confirmRow='';
+      if (cancelPending && needsConfirm) {
+        // Show inline confirmation
+        actionRow = '<div class="action-row">'
+          +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
+          +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
+          +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">Cancel</button>'
+          +'</div>';
+        confirmRow = '<div class="confirm-cancel-row">'
+          +'<span style="font-size:12px;color:#A32D2D;">Cancel this '+t.category+' task?</span>'
+          +'<button class="action-btn danger" style="padding:4px 10px" onclick="event.stopPropagation();markCancelled(\''+t.id+'\')">Yes, cancel</button>'
+          +'<button class="action-btn muted" style="padding:4px 10px" onclick="event.stopPropagation();clearPendingCancel(\''+t.id+'\')">No</button>'
+          +'</div>';
+      } else {
+        actionRow = '<div class="action-row">'
+          +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
+          +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
+          +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">Cancel</button>'
+          +'</div>';
+      }
+      exp='<div class="task-expanded">'+note+actionRow+confirmRow
         +(ws?'<div class="write-status">'+ws+'</div>':'')
         +'</div>';
     }
@@ -537,20 +552,25 @@ function quickDone(id){
   if(completions[id]==='done') sendToSheet(id,'Completed');
   render();
 }
-function markDone(id){completions[id]='done';expanded[id]=false;sendToSheet(id,'Completed');render();}
+function markDone(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
 
 function confirmCancel(id){
   var task=null;
   for (var i=0;i<TASKS.length;i++){if(TASKS[i].id===id){task=TASKS[i];break;}}
   if (!task){markCancelled(id);return;}
   if (requiresConfirmToCancel(task)){
-    if (!confirm('Cancel "'+task.name+'"? This is a '+task.category+' task. Are you sure?')) return;
+    pendingCancel[id]=true;
+    expanded[id]=true;
+    render();
+  } else {
+    markCancelled(id);
   }
-  markCancelled(id);
 }
+function clearPendingCancel(id){pendingCancel[id]=false;render();}
 
-function markCancelled(id){completions[id]='cancelled';expanded[id]=false;sendToSheet(id,'Cancelled');render();}
-function markFreeRoll(id){completions[id]='done';expanded[id]=false;sendToSheet(id,'Free-rolled');render();}
+function markDone(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
+function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Cancelled');render();}
+function markFreeRoll(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Free-rolled');render();}
 
 function sendToSheet(taskId,status){
   var task=null;
