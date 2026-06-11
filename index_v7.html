@@ -41,6 +41,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .check-box { width: 20px; height: 20px; min-width: 20px; border: 2px solid #ccc; border-radius: 5px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .check-box.checked { background: #1D9E75; border-color: #1D9E75; }
 .check-box.checked::after { content: '\2713'; font-size: 12px; color: white; font-weight: 700; }
+.check-box.cancelled-box { background: #f5f5f0; border-color: #ccc; }
 .check-box.cancelled-box::after { content: '\2014'; font-size: 11px; color: #aaa; }
 .task-info { flex: 1; min-width: 0; }
 .task-name { font-size: 14px; color: #111; }
@@ -135,12 +136,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <h3>Add task</h3>
-
     <div class="field">
       <label>Task name <span class="req">*</span></label>
       <input type="text" id="new-name" placeholder="e.g. Clean refrigerator">
     </div>
-
     <div class="field-row">
       <div class="field">
         <label>Category <span class="req">*</span></label>
@@ -165,7 +164,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </select>
       </div>
     </div>
-
     <div class="field-row">
       <div class="field">
         <label>Time (optional)</label>
@@ -181,7 +179,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </select>
       </div>
     </div>
-
     <div class="field" id="days-field">
       <label>Days of week</label>
       <div class="day-btns">
@@ -194,7 +191,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <button type="button" class="day-btn" data-day="Saturday" onclick="toggleDay(this)">Sa</button>
       </div>
     </div>
-
     <div class="field" id="freq-field">
       <label>Frequency</label>
       <select id="new-freq">
@@ -204,7 +200,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <option value="4">Every 4 weeks</option>
       </select>
     </div>
-
     <div class="field-row">
       <div class="field">
         <label>Start date <span class="req">*</span></label>
@@ -215,7 +210,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <input type="date" id="new-end">
       </div>
     </div>
-
     <div class="field-row">
       <div class="field">
         <label>Rollover <span class="req">*</span></label>
@@ -229,17 +223,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <input type="number" id="new-reminder" placeholder="e.g. 30">
       </div>
     </div>
-
     <div class="field">
       <label>Notes (optional)</label>
       <input type="text" id="new-notes" placeholder="e.g. Take with food">
     </div>
-
     <div class="checkbox-row">
       <input type="checkbox" id="new-calendar">
       <label for="new-calendar">Add to Google Calendar</label>
     </div>
-
     <div class="modal-btns">
       <button class="btn-cancel-m" onclick="closeModal()">Cancel</button>
       <button class="btn-save-m" onclick="saveNewTask()">Add</button>
@@ -259,6 +250,10 @@ var viewMode='today', selectedDays=[];
 var CHECKIN_TASK_PERIOD = {'TASK_001':'morning','TASK_002':'midday','TASK_003':'evening'};
 
 function isAptCategory(cat) { return cat && cat.toLowerCase().indexOf('apt') > -1; }
+function isMedCategory(cat) { return cat === 'Med'; }
+function requiresConfirmToCancel(task) {
+  return isAptCategory(task.category) || isMedCategory(task.category) || task.type === 'Med';
+}
 
 function callSheet(payload) {
   return fetch(SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload)))
@@ -363,7 +358,36 @@ function badgeClass(cat,type){
   return 'badge-other';
 }
 
-function toMin(s){var m=s&&s.match(/(\d+):(\d+)\s*(AM|PM)/i);if(!m)return 9999;var h=parseInt(m[1]),mn=parseInt(m[2]);if(m[3].toUpperCase()==='PM'&&h!==12)h+=12;if(m[3].toUpperCase()==='AM'&&h===12)h=0;return h*60+mn;}
+// ── TIME FORMAT ───────────────────────────────────────────────
+// Handles: "9:00 AM", "9:00 PM", "9:00" (assumes AM if h<12)
+function toMin(s){
+  if (!s || !s.trim()) return 9999;
+  var m = s.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!m) return 9999;
+  var h=parseInt(m[1]), mn=parseInt(m[2]);
+  var meridiem = m[3] ? m[3].toUpperCase() : (h < 12 ? 'AM' : 'PM');
+  if (meridiem==='PM' && h!==12) h+=12;
+  if (meridiem==='AM' && h===12) h=0;
+  return h*60+mn;
+}
+
+// Normalize time to H:MM AM/PM format
+function normalizeTime(s){
+  if (!s || !s.trim()) return '';
+  var m = s.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!m) return s;
+  var h=parseInt(m[1]), mn=parseInt(m[2]);
+  var meridiem = m[3] ? m[3].toUpperCase() : (h < 12 ? 'AM' : 'PM');
+  if (meridiem==='PM' && h!==12) h+=12;
+  if (meridiem==='AM' && h===12) h=0;
+  var displayH = h % 12 || 12;
+  var displayM = meridiem==='PM' ? (h>=12?'PM':'AM') : 'AM';
+  // recalc meridiem from 24h
+  displayM = h >= 12 ? 'PM' : 'AM';
+  displayH = h % 12 || 12;
+  return displayH + ':' + (mn < 10 ? '0'+mn : mn) + ' ' + displayM;
+}
+
 function fmtDate(d){return DAY_SHORT[d.getDay()]+' '+MONTHS[d.getMonth()]+' '+d.getDate();}
 
 function cadenceText(t){
@@ -388,14 +412,23 @@ function renderToday(){
   var allTasks=todayTasks();
   var scheduled=allTasks.filter(function(t){return t.time&&t.time.trim();}).sort(function(a,b){return toMin(a.time)-toMin(b.time);});
   var anytime=allTasks.filter(function(t){return !t.time||!t.time.trim();});
-  var total=0,done=0;
+
+  // Progress bar: only tasks with counts_toward_rate=TRUE
+  // Free-roll = done visually but counted_in_rate=FALSE, so excluded from total
+  var total=0, done=0;
   allTasks.forEach(function(t){
-    if (t.type!=='Check-in'&&t.counts_toward_rate!==false){total++;if(completions[t.id]==='done')done++;}
+    if (t.type==='Check-in') return;
+    if (t.type==='Free-roll') return; // never counts
+    if (t.counts_toward_rate===false) return;
+    total++;
+    if (completions[t.id]==='done') done++;
   });
+
   var pct=total?Math.round(done/total*100):0;
   document.getElementById('prog-txt').textContent=done+' of '+total+' tasks complete';
   document.getElementById('prog-pct').textContent=pct+'%';
   document.getElementById('pbar').style.width=pct+'%';
+
   var html='';
   if (scheduled.length){html+='<div class="section-header">Scheduled</div>';scheduled.forEach(function(t){html+=renderTask(t);});}
   if (anytime.length){html+='<div class="section-header">Anytime</div>';anytime.forEach(function(t){html+=renderTask(t);});}
@@ -427,9 +460,10 @@ function renderUpcoming(){
 function renderUpcomingTask(t,nextDate){
   var isCheckin=t.type==='Check-in';
   var aptClass=isAptCategory(t.category)?'apt':'';
+  var displayTime=normalizeTime(t.time);
   var meta='<span class="badge '+badgeClass(t.category,t.type)+'">'+(isCheckin?'Check-in':t.category)+'</span>';
-  if (t.repeat!=='Daily'){var ds=fmtDate(nextDate);if(t.time)ds+=', '+t.time;meta+='<span class="task-time-lbl">'+ds+'</span>';}
-  else if (t.time){meta+='<span class="task-time-lbl">'+t.time+'</span>';}
+  if (t.repeat!=='Daily'){var ds=fmtDate(nextDate);if(displayTime)ds+=', '+displayTime;meta+='<span class="task-time-lbl">'+ds+'</span>';}
+  else if (displayTime){meta+='<span class="task-time-lbl">'+displayTime+'</span>';}
   return '<div class="task-card '+aptClass+'"><div class="task-row">'
     +'<div class="check-box"></div>'
     +'<div class="task-info"><div class="task-name">'+t.name+'</div>'
@@ -441,19 +475,25 @@ function renderTask(t){
   var isCheckin=t.type==='Check-in',isDone=completions[t.id]==='done',isCancelled=completions[t.id]==='cancelled';
   var isExp=expanded[t.id],ws=writeStatuses[t.id]||'';
   var aptClass=isAptCategory(t.category)?'apt':'';
+  var displayTime=normalizeTime(t.time);
   var meta='';
-  if (t.time) meta+='<span class="task-time-lbl">'+t.time+'</span>';
+  if (displayTime) meta+='<span class="task-time-lbl">'+displayTime+'</span>';
   meta+='<span class="badge '+badgeClass(t.category,t.type)+'">'+(isCheckin?'Check-in':t.category)+'</span>';
   var exp='';
   if (isExp){
     if (isCheckin){exp=renderCheckinBody(t);}
     else{
       var note=t.note?'<div class="task-note-text">'+t.note+'</div>':'';
+      // Cancel button available for ALL tasks, but with confirmation for Apt/Med
+      var cancelLabel = requiresConfirmToCancel(t) ? 'Cancel*' : 'Cancel';
       exp='<div class="task-expanded">'+note+'<div class="action-row">'
         +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
         +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
-        +(isAptCategory(t.category)?'':'<button class="action-btn danger" onclick="event.stopPropagation();markCancelled(\''+t.id+'\')">Cancel</button>')
-        +'</div>'+(ws?'<div class="write-status">'+ws+'</div>':'')+'</div>';
+        +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">'+cancelLabel+'</button>'
+        +'</div>'
+        +(requiresConfirmToCancel(t)?'<div class="write-status">* Requires confirmation</div>':'')
+        +(ws?'<div class="write-status">'+ws+'</div>':'')
+        +'</div>';
     }
   }
   return '<div class="task-card '+aptClass+(isDone?' done':isCancelled?' cancelled':'')+'" id="card-'+t.id+'">'
@@ -491,8 +531,24 @@ function renderCheckinBody(t){
 }
 
 function toggleExpand(id){expanded[id]=!expanded[id];render();}
-function quickDone(id){completions[id]=completions[id]==='done'?null:'done';if(completions[id]==='done')sendToSheet(id,'Completed');render();}
+
+function quickDone(id){
+  completions[id]=completions[id]==='done'?null:'done';
+  if(completions[id]==='done') sendToSheet(id,'Completed');
+  render();
+}
 function markDone(id){completions[id]='done';expanded[id]=false;sendToSheet(id,'Completed');render();}
+
+function confirmCancel(id){
+  var task=null;
+  for (var i=0;i<TASKS.length;i++){if(TASKS[i].id===id){task=TASKS[i];break;}}
+  if (!task){markCancelled(id);return;}
+  if (requiresConfirmToCancel(task)){
+    if (!confirm('Cancel "'+task.name+'"? This is a '+task.category+' task. Are you sure?')) return;
+  }
+  markCancelled(id);
+}
+
 function markCancelled(id){completions[id]='cancelled';expanded[id]=false;sendToSheet(id,'Cancelled');render();}
 function markFreeRoll(id){completions[id]='done';expanded[id]=false;sendToSheet(id,'Free-rolled');render();}
 
@@ -500,7 +556,14 @@ function sendToSheet(taskId,status){
   var task=null;
   for (var i=0;i<TASKS.length;i++){if(TASKS[i].id===taskId){task=TASKS[i];break;}}
   if (!task) task={name:taskId,type:'Flexible',counts_toward_rate:true};
-  var countedInRate=(status==='Completed'&&task.counts_toward_rate!==false)||(status==='Free-rolled'&&false);
+
+  // counted_in_rate logic:
+  // Completed = TRUE (if task counts_toward_rate)
+  // Free-rolled = FALSE always
+  // Cancelled = FALSE always
+  var countedInRate = false;
+  if (status==='Completed') countedInRate = task.counts_toward_rate !== false && task.type !== 'Check-in' && task.type !== 'Free-roll';
+
   writeStatuses[taskId]='Saving...';render();
   callSheet({action:'logCompletion',task_id:taskId,task_name:task.name,task_type:task.type||'Flexible',
     scheduled_date:getViewDate().toISOString().split('T')[0],completed_at:new Date().toLocaleString('en-US'),
@@ -582,7 +645,7 @@ function saveNewTask(){
   var payload={
     action:'addTask',name:name,category:cat,
     type:document.getElementById('new-type').value,
-    time:document.getElementById('new-time').value.trim(),
+    time:normalizeTime(document.getElementById('new-time').value.trim()),
     repeat:rep,days:selectedDays.join(', '),
     freq:parseInt(document.getElementById('new-freq').value)||1,
     start_date:document.getElementById('new-start').value,
