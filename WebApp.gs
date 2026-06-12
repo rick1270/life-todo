@@ -1,6 +1,15 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.0
+// RICK'S TASK TRACKER — WebApp.gs v6.2
 // ============================================================
+// Changes in v6.2:
+// - midnightCleanup: calculate minutes_late for Time-sensitive tasks
+//   Compares completed_at to scheduled_time, writes result to Completions sheet
+//   Returns 0 if on time or early, positive integer if late
+//   Respects manual edits to completed_at made before 3am
+// Changes in v6.1:
+// - midnightCleanup: completion_rate now excludes Free-rolled tasks
+//   (was: completed + freeRolled / scheduled — inflated rate)
+//   (now: completed / scheduled — accurate rate)
 // Changes in v6.0:
 // - getTasks now returns contingent_delay and contingent_delay_unit fields
 // Changes in v5.0:
@@ -329,7 +338,6 @@ function logCheckin(payload) {
 }
 
 // ── CANCEL SERIES ─────────────────────────────────────────────
-// Sets end_date to today on a task, stopping all future occurrences
 function cancelSeries(payload) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName('Tasks');
@@ -348,7 +356,7 @@ function cancelSeries(payload) {
 }
 
 // ── 3AM CLEANUP ───────────────────────────────────────────────
-// Set this function as a daily time-driven trigger at 3:00 AM
+// Runs daily at 3am via Apps Script time-driven trigger
 function midnightCleanup() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const tz = TZ;
@@ -366,18 +374,63 @@ function midnightCleanup() {
   taskHeaders.forEach((h, i) => tCol[h] = i);
 
   const compData = compSheet.getDataRange().getValues();
+  const compHeaders = compData[0];
+  const cCol = {};
+  compHeaders.forEach((h, i) => cCol[h] = i);
 
   // Build set of task_ids completed yesterday
+  // Also track completion row index for minutes_late calculation
   const completedYesterday = {};
+  const completionRowIndex = {}; // task_id → sheet row index (1-based)
   for (let i = 1; i < compData.length; i++) {
     const row = compData[i];
     let sd = row[4];
     if (sd instanceof Date) sd = Utilities.formatDate(sd, tz, 'yyyy-MM-dd');
     else sd = String(sd);
-    if (sd === yesterdayStr) completedYesterday[row[1]] = row[7]; // task_id → status
+    if (sd === yesterdayStr) {
+      completedYesterday[row[1]] = row[7]; // task_id → status
+      completionRowIndex[row[1]] = i + 1;  // task_id → sheet row (1-based)
+    }
   }
 
-  // Find tasks that were scheduled yesterday and not completed
+  // ── MINUTES LATE ─────────────────────────────────────────────
+  // For Time-sensitive tasks completed yesterday, calculate minutes late
+  // Only writes if completed_at is after scheduled_time; otherwise writes 0
+  for (let i = 1; i < taskData.length; i++) {
+    const r = taskData[i];
+    const taskId   = String(r[tCol['task_id']]);
+    const taskType = String(r[tCol['task_type']]);
+    const schedTime = String(r[tCol['scheduled_time']] || '').trim();
+
+    if (taskType !== 'Time-sensitive') continue;
+    if (!schedTime) continue;
+    if (completedYesterday[taskId] !== 'Completed') continue;
+
+    const rowIdx = completionRowIndex[taskId];
+    if (!rowIdx) continue;
+
+    // Parse scheduled time into minutes since midnight
+    const stMatch = schedTime.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!stMatch) continue;
+    let stH = parseInt(stMatch[1]), stM = parseInt(stMatch[2]);
+    if (stMatch[3].toUpperCase() === 'PM' && stH !== 12) stH += 12;
+    if (stMatch[3].toUpperCase() === 'AM' && stH === 12) stH = 0;
+    const scheduledMinutes = stH * 60 + stM;
+
+    // Parse completed_at from sheet
+    const completedAtRaw = compData[rowIdx - 1][cCol['completed_at']];
+    if (!completedAtRaw) continue;
+    const completedAt = completedAtRaw instanceof Date ? completedAtRaw : new Date(completedAtRaw);
+    if (isNaN(completedAt)) continue;
+    const completedMinutes = completedAt.getHours() * 60 + completedAt.getMinutes();
+
+    const minutesLate = Math.max(0, completedMinutes - scheduledMinutes);
+
+    // Write to minutes_late column in Completions sheet
+    const minutesLateCol = cCol['minutes_late'] + 1; // 1-based column
+    compSheet.getRange(rowIdx, minutesLateCol).setValue(minutesLate > 0 ? minutesLate : 0);
+  }
+
   let scheduled = 0, completed = 0, missed = 0, cancelled = 0, freeRolled = 0, checkins = 0;
   const newCompRows = [];
 
@@ -391,9 +444,8 @@ function midnightCleanup() {
     const taskType = r[tCol['task_type']];
     const repeat   = r[tCol['repeat_type']];
     const rolloverVal = String(r[tCol['rollover']]).toUpperCase();
-    const rollover = rolloverVal !== 'FALSE'; // blank = TRUE
+    const rollover = rolloverVal !== 'FALSE';
 
-    // Was this task scheduled yesterday?
     const wasScheduled = isTaskScheduledOnDate(r, tCol, yesterday);
     if (!wasScheduled) continue;
 
@@ -419,19 +471,13 @@ function midnightCleanup() {
       const today = new Date();
       today.setHours(0,0,0,0);
       const nextOcc = getNextOccurrenceAfter(r, tCol, today);
-
-      // Roll over: set start_date to today only if next occurrence is more than 1 day away
       const daysUntilNext = nextOcc ? Math.round((nextOcc - today) / (24*60*60*1000)) : 999;
       if (daysUntilNext > 1) {
-        // Update start_date to today to make it appear today
-        // For Once tasks: update start_date directly
         if (repeat === 'Once' || repeat === 'Self-Contingent') {
           tasksSheet.getRange(i+1, tCol['start_date']+1).setValue(
             Utilities.formatDate(today, tz, 'yyyy-MM-dd')
           );
         }
-        // For Weekly: task already has its own schedule, rollover means
-        // add a one-time override entry — handled by app showing yesterday's incomplete task today
       }
     }
   }
@@ -443,10 +489,12 @@ function midnightCleanup() {
   }
 
   // Write Daily Log row
+  // FIX v6.1: completion_rate uses completed only, not completed + freeRolled
+  // Free-rolled tasks have counted_in_rate=FALSE so must not inflate the rate
   const logLastRow = logSheet.getLastRow();
   const logLastId = logLastRow > 1 ? logSheet.getRange(logLastRow, 1).getValue() : null;
   if (logLastId !== yesterdayStr) {
-    const rate = scheduled > 0 ? Math.round((completed + freeRolled) / scheduled * 100) + '%' : '0%';
+    const rate = scheduled > 0 ? Math.round(completed / scheduled * 100) + '%' : '0%';
     logSheet.appendRow([
       yesterdayStr, scheduled, completed, cancelled, freeRolled,
       rate, 0, checkins, '', '', ''
