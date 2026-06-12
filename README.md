@@ -1,4 +1,3 @@
-# life-todo
 # Rick's Task Tracker
 
 A personal daily task management PWA built on Google Apps Script + Google Sheets. Designed for ADHD/depression management with medication tracking, health tasks, check-ins, and completion rate metrics.
