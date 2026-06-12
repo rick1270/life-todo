@@ -1,4 +1,3 @@
-# life-todo
 # Rick's Task Tracker
 
 A personal daily task management PWA built on Google Apps Script + Google Sheets. Designed for ADHD/depression management with medication tracking, health tasks, check-ins, and completion rate metrics.
@@ -27,12 +26,13 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - Date navigation (Yesterday / Today / Tomorrow)
 - Task Notes display in expanded panel
 - 3am cleanup trigger active (Day timer, 3-4am, GMT-4)
+- completion_rate calculated correctly (completed only, not free-rolled)
+- minutes_late calculated at 3am for Time-sensitive tasks
 
 ### Outstanding (Priority Order)
 - [ ] **Metrics tab auto-calculation** — weekly summaries not yet built
-- [x] ~~**minutes_late**~~ — calculated at 3am for Time-sensitive tasks
-- [ ] **Self-Contingent 21-day delay** (Haircut) — not fully implemented
-- [ ] **Xelstrym Remove Patch** — RULE_002 exists but auto-create not wired in app
+- [ ] **Self-Contingent repeat logic** — after completion, start_date resets so task reappears after delay
+- [ ] **Rules auto-create** — when trigger task completed, show target task per Rules tab
 
 ---
 
@@ -89,7 +89,9 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - Calendar events tagged `[TaskTracker]` for easy bulk removal
 - Apt tasks: rollover=FALSE, auto-calendar, reminder=30min default
 - Free-roll tasks: never count toward rate regardless of status logged
-- Completion rate = completed only; free-rolled never counts
+- Completion rate = completed tasks only; free-rolled never counts
+- minutes_late = 0 if on time or early; never negative
+- Self-Contingent and Rules items are patterns, not hardcoded features
 
 ---
 
@@ -98,7 +100,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Version | Focus |
 |---|---|
 | v0.1 ✅ | MVP — sheet structure, PWA, calendar script |
-| v0.2 🔄 | Metrics tab, minutes_late, Self-Contingent delay, Xelstrym auto-create |
+| v0.2 🔄 | Metrics tab, Self-Contingent repeat, Rules auto-create |
 | v0.3 | Fitness tracker integration (Strava / Fitbod) |
 | v0.4 | Health dashboard — TCX, sleep, steps |
 | v1.0 | Full integration. Metrics for Lien Turley. |
