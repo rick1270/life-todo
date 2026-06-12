@@ -1,3 +1,4 @@
+# life-todo
 # Rick's Task Tracker
 
 A personal daily task management PWA built on Google Apps Script + Google Sheets. Designed for ADHD/depression management with medication tracking, health tasks, check-ins, and completion rate metrics.
@@ -9,7 +10,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Field | Value |
 |---|---|
 | Last updated | 2026-06-12 |
-| App version | WebApp.gs v6.0 / index.html v6 |
+| App version | WebApp.gs v6.1 / index.html v6 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
 
@@ -24,10 +25,10 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - Today / Upcoming toggle
 - Progress bar (excludes Free-roll and Check-in from rate)
 - Date navigation (Yesterday / Today / Tomorrow)
+- Task Notes display in expanded panel
+- 3am cleanup trigger active (Day timer, 3-4am, GMT-4)
 
 ### Outstanding (Priority Order)
-- [ ] **3am cleanup trigger** — needs to be set and verified in Apps Script triggers
-- [ ] **Task Notes display** — notes exist in sheet but not shown in app expand panel
 - [ ] **Metrics tab auto-calculation** — weekly summaries not yet built
 - [ ] **minutes_late** — not calculated for Time-sensitive tasks
 - [ ] **Self-Contingent 21-day delay** (Haircut) — not fully implemented
@@ -88,6 +89,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - Calendar events tagged `[TaskTracker]` for easy bulk removal
 - Apt tasks: rollover=FALSE, auto-calendar, reminder=30min default
 - Free-roll tasks: never count toward rate regardless of status logged
+- Completion rate = completed only; free-rolled never counts
 
 ---
 
@@ -96,7 +98,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Version | Focus |
 |---|---|
 | v0.1 ✅ | MVP — sheet structure, PWA, calendar script |
-| v0.2 🔄 | Wire 3am cleanup, Task Notes display, minutes_late |
+| v0.2 🔄 | Metrics tab, minutes_late, Self-Contingent delay, Xelstrym auto-create |
 | v0.3 | Fitness tracker integration (Strava / Fitbod) |
 | v0.4 | Health dashboard — TCX, sleep, steps |
 | v1.0 | Full integration. Metrics for Lien Turley. |
@@ -106,8 +108,6 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 ## Session Continuity
 
 At the start of each Claude session:
-1. Claude reads this README for current state
-2. Claude reads CHANGELOG.md for recent changes and decisions
+1. Claude fetches README.md from GitHub for current state
+2. Claude fetches CHANGELOG.md from GitHub for recent changes and decisions
 3. Claude reads DATA_DICTIONARY.md for schema reference
-
-Files pinned to Claude Project: `README.md`, `CHANGELOG.md`, `DATA_DICTIONARY.md`, `WebApp.gs`, `index.html`
