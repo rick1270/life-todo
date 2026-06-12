@@ -245,6 +245,7 @@ var DAY_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
+var completionTimes={}; // taskId → Date object of when task was completed
 var TASKS=[], questions=[], rules=[];
 var viewMode='today', selectedDays=[];
 var CHECKIN_TASK_PERIOD = {'TASK_001':'morning','TASK_002':'midday','TASK_003':'evening'};
@@ -334,7 +335,26 @@ function isTaskOnDay(t,d){
 
 function isContingentVisible(t){
   if (!t.contingent_on) return true;
+  if (t.contingent_on === 'SELF') return true; // Self-Contingent always visible
   return completions[t.contingent_on]==='done';
+}
+
+// Calculate display time for a contingent task based on parent completion time + delay
+function getContingentTime(t){
+  if (!t.contingent_on || t.contingent_on === 'SELF') return t.time;
+  var parentCompleteTime = completionTimes[t.contingent_on];
+  if (!parentCompleteTime) return t.time;
+  var delay = parseInt(t.contingent_delay) || 0;
+  var unit = (t.contingent_delay_unit || 'Minutes').toLowerCase();
+  var ms = 0;
+  if (unit === 'minutes') ms = delay * 60 * 1000;
+  else if (unit === 'hours') ms = delay * 60 * 60 * 1000;
+  else if (unit === 'days') ms = delay * 24 * 60 * 60 * 1000;
+  var displayTime = new Date(parentCompleteTime.getTime() + ms);
+  var h = displayTime.getHours(), mn = displayTime.getMinutes();
+  var meridiem = h >= 12 ? 'PM' : 'AM';
+  var displayH = h % 12 || 12;
+  return displayH + ':' + (mn < 10 ? '0'+mn : mn) + ' ' + meridiem;
 }
 
 function todayTasks(){
@@ -475,7 +495,7 @@ function renderTask(t){
   var isCheckin=t.type==='Check-in',isDone=completions[t.id]==='done',isCancelled=completions[t.id]==='cancelled';
   var isExp=expanded[t.id],ws=writeStatuses[t.id]||'';
   var aptClass=isAptCategory(t.category)?'apt':'';
-  var displayTime=normalizeTime(t.time);
+  var displayTime=t.contingent_on && t.contingent_on!=='SELF' ? getContingentTime(t) : normalizeTime(t.time);
   var meta='';
   if (displayTime) meta+='<span class="task-time-lbl">'+displayTime+'</span>';
   meta+='<span class="badge '+badgeClass(t.category,t.type)+'">'+(isCheckin?'Check-in':t.category)+'</span>';
@@ -549,7 +569,8 @@ function toggleExpand(id){expanded[id]=!expanded[id];render();}
 
 function quickDone(id){
   completions[id]=completions[id]==='done'?null:'done';
-  if(completions[id]==='done') sendToSheet(id,'Completed');
+  if(completions[id]==='done'){completionTimes[id]=new Date();sendToSheet(id,'Completed');}
+  else{delete completionTimes[id];}
   render();
 }
 function markDone(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
@@ -568,9 +589,9 @@ function confirmCancel(id){
 }
 function clearPendingCancel(id){pendingCancel[id]=false;render();}
 
-function markDone(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
+function markDone(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
 function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Cancelled');render();}
-function markFreeRoll(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Free-rolled');render();}
+function markFreeRoll(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Free-rolled');render();}
 
 function sendToSheet(taskId,status){
   var task=null;

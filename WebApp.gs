@@ -1,6 +1,8 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v5.0
+// RICK'S TASK TRACKER — WebApp.gs v6.0
 // ============================================================
+// Changes in v6.0:
+// - getTasks now returns contingent_delay and contingent_delay_unit fields
 // Changes in v5.0:
 // - getTasks now returns rollover and reminder_minutes fields
 // - addTask handles rollover, reminder_minutes, add_to_calendar
@@ -79,7 +81,9 @@ function getTasks() {
       freq:             parseInt(r[col['repeat_occurrence']]) || 1,
       start_date:       fmtDate(r[col['start_date']]),
       end_date:         fmtDate(r[col['end_date']]),
-      contingent_on:    r[col['contingent_on']] || '',
+      contingent_on:      r[col['contingent_on']] || '',
+      contingent_delay:   r[col['contingent_delay']] || 0,
+      contingent_delay_unit: r[col['contingent_delay_unit']] || 'Minutes',
       counts_toward_rate: String(r[col['counts_toward_rate']]).toUpperCase() === 'TRUE',
       rollover:         rollover,
       reminder_minutes: r[col['reminder_minutes']] || '',

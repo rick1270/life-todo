@@ -1,9 +1,35 @@
 # Task Tracker Changelog
 
+## Session 2026-06-12
+
+### Changes
+- index_v8.html: inline cancel confirmation for Med/Apt tasks (replaces confirm() blocked by iframe)
+- index_v8.html: toMin() handles times without AM/PM, normalizeTime() standardizes display
+- index_v8.html: Free-roll excluded from progress bar, counted_in_rate logic explicit for all statuses
+- Cancel available for ALL task types; Med/Apt show inline Yes/No confirmation bar
+- index_v9.html: contingent task display time = parent completion time + delay (Minutes/Hours/Days)
+- index_v9.html: completionTimes{} tracks when each task was completed this session
+- WebApp_v5.gs: getTasks now returns contingent_delay and contingent_delay_unit fields
+- Google Drive folder confirmed readable by Claude (write not yet working from web interface)
+- COMP_0008 duplicate fixed manually
+- TASK_015 Yoga time fixed to 8:00 AM in sheet
+
+### Decisions
+- Cancel confirmation: inline red bar with Yes/No (no popup dialog — blocked by iframe)
+- Contingent task time: shown as parent_completion_time + delay, not static scheduled_time
+- Rules tab kept for future complex rules; contingent logic driven by Tasks tab columns
+- Drive folder ID: 1DrQ237ZQ1o_tbshhtu5uGaBS-W7qkeWu
+
+### Outstanding
+- WebApp_v5.gs needs to be pasted into Apps Script and redeployed
+- index_v9.html needs to be pasted into Apps Script index.html and redeployed
+- Self-Contingent (Haircut) 21-day delay logic not yet implemented in app
+
 ## Session 2026-06-08
 
 ### Changes
-- index.html v6: fixed category dropdown (Other, Health, Med, Work, Checkin, Apt Medical, Apt Other), type dropdown (Flexible, Time-sensitive, Med, Free-roll, Check-in)
+- index_v6.html: fixed category dropdown (Other, Health, Med, Work, Checkin, Apt Medical, Apt Other)
+- index_v6.html: fixed type dropdown (Flexible, Time-sensitive, Med, Free-roll, Check-in)
 - Free-roll type correctly sets counted_in_rate=FALSE in Completions
 - Work category badge added
 - updateReadMe v2: fixed pipe character issue, notes now write to correct columns
