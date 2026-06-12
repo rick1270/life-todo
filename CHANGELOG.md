@@ -3,6 +3,11 @@
 ## Session 2026-06-12 (evening)
 
 ### Changes
+- WebApp.gs v6.2: minutes_late calculation added to midnightCleanup
+  - Loops Time-sensitive tasks completed yesterday
+  - Compares completed_at to scheduled_time
+  - Writes positive integer (minutes late) or 0 to Completions sheet
+  - Respects manual edits to completed_at made before 3am
 - WebApp.gs v6.1: fixed completion_rate in midnightCleanup
   - Was: (completed + freeRolled) / scheduled — inflated rate
   - Now: completed / scheduled — accurate rate
@@ -10,11 +15,14 @@
 - README.md moved from Google Sheet ReadMe tab to GitHub
 - CHANGELOG.md confirmed live on GitHub
 - Session continuity now reads from raw.githubusercontent.com
+- Task Notes confirmed working (was already built, not a bug)
 
 ### Decisions
 - GitHub is source of truth for all docs going forward (README, CHANGELOG, DATA_DICTIONARY)
 - ReadMe tab in Google Sheet to be deleted by Rick
 - Completion rate = completed tasks only; free-rolled never counts toward rate
+- minutes_late = 0 if on time or early; never negative
+- Self-Contingent and Rules items are patterns, not hardcoded features
 
 ## Session 2026-06-12 (afternoon)
 
