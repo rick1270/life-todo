@@ -428,10 +428,26 @@ function render(){
   else renderUpcoming();
 }
 
+function getEffectiveTime(t){
+  // For contingent tasks with a delay, use calculated time; otherwise use scheduled_time
+  if (t.contingent_on && t.contingent_on !== 'SELF' && completionTimes[t.contingent_on]) {
+    return getContingentTime(t);
+  }
+  return t.time || '';
+}
+
 function renderToday(){
   var allTasks=todayTasks();
-  var scheduled=allTasks.filter(function(t){return t.time&&t.time.trim();}).sort(function(a,b){return toMin(a.time)-toMin(b.time);});
-  var anytime=allTasks.filter(function(t){return !t.time||!t.time.trim();});
+
+  // Split into scheduled vs anytime using effective time
+  var scheduled=allTasks.filter(function(t){
+    return getEffectiveTime(t).trim() !== '';
+  }).sort(function(a,b){
+    return toMin(getEffectiveTime(a)) - toMin(getEffectiveTime(b));
+  });
+  var anytime=allTasks.filter(function(t){
+    return getEffectiveTime(t).trim() === '';
+  });
 
   // Progress bar: only tasks with counts_toward_rate=TRUE
   // Free-roll = done visually but counted_in_rate=FALSE, so excluded from total
