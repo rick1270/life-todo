@@ -520,22 +520,32 @@ function renderTask(t){
     if (isCheckin){exp=renderCheckinBody(t);}
     else{
       var note=t.note?'<div class="task-note-text">'+t.note+'</div>':'';
-      var needsConfirm = requiresConfirmToCancel(t);
-      var cancelPending = pendingCancel[t.id];
+      var cancelState = pendingCancel[t.id]; // undefined, 'prompt', 'confirm-series'
       var actionRow, confirmRow='';
-      if (cancelPending && needsConfirm) {
-        // Show inline confirmation
+
+      if (cancelState === 'prompt') {
+        // Step 1: Show Cancel Today vs Cancel Series
         actionRow = '<div class="action-row">'
           +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
           +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
-          +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">Cancel</button>'
+          +'<button class="action-btn danger" onclick="event.stopPropagation();clearPendingCancel(\''+t.id+'\')">&#8249; Back</button>'
           +'</div>';
         confirmRow = '<div class="confirm-cancel-row">'
-          +'<span style="font-size:12px;color:#A32D2D;">Cancel this '+t.category+' task?</span>'
-          +'<button class="action-btn danger" style="padding:4px 10px" onclick="event.stopPropagation();markCancelled(\''+t.id+'\')">Yes, cancel</button>'
-          +'<button class="action-btn muted" style="padding:4px 10px" onclick="event.stopPropagation();clearPendingCancel(\''+t.id+'\')">No</button>'
+          +'<button class="action-btn danger" style="padding:6px 14px" onclick="event.stopPropagation();markCancelled(\''+t.id+'\')">Cancel Today</button>'
+          +'<button class="action-btn muted" style="padding:6px 14px;color:#A32D2D" onclick="event.stopPropagation();promptCancelSeries(\''+t.id+'\')">Cancel Series</button>'
+          +'</div>';
+      } else if (cancelState === 'confirm-series') {
+        // Step 2: Confirm series cancel
+        actionRow = '<div class="action-row">'
+          +'<button class="action-btn muted" onclick="event.stopPropagation();pendingCancel[\''+t.id+'\']=\'prompt\';render()">&#8249; Back</button>'
+          +'</div>';
+        confirmRow = '<div class="confirm-cancel-row">'
+          +'<span style="font-size:12px;color:#A32D2D;width:100%">Cancel today + all future occurrences of "'+t.name+'"?</span>'
+          +'<button class="action-btn danger" style="padding:6px 14px" onclick="event.stopPropagation();markCancelledSeries(\''+t.id+'\')">Yes, cancel series</button>'
+          +'<button class="action-btn muted" style="padding:6px 14px" onclick="event.stopPropagation();clearPendingCancel(\''+t.id+'\')">No</button>'
           +'</div>';
       } else {
+        // Default action row
         actionRow = '<div class="action-row">'
           +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
           +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
@@ -589,25 +599,37 @@ function quickDone(id){
   else{delete completionTimes[id];}
   render();
 }
-function markDone(id){completions[id]='done';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
-
 function confirmCancel(id){
+  pendingCancel[id]='prompt';
+  expanded[id]=true;
+  render();
+}
+function clearPendingCancel(id){pendingCancel[id]=null;render();}
+function promptCancelSeries(id){pendingCancel[id]='confirm-series';render();}
+
+function markCancelledSeries(id){
   var task=null;
   for (var i=0;i<TASKS.length;i++){if(TASKS[i].id===id){task=TASKS[i];break;}}
-  if (!task){markCancelled(id);return;}
-  if (requiresConfirmToCancel(task)){
-    pendingCancel[id]=true;
-    expanded[id]=true;
+  completions[id]='cancelled';
+  expanded[id]=false;
+  pendingCancel[id]=null;
+  // Log today as cancelled
+  sendToSheet(id,'Cancelled');
+  // Set end_date to today in sheet
+  var today=getViewDate().toISOString().split('T')[0];
+  writeStatuses[id]='Cancelling series...';
+  callSheet({action:'cancelSeries',task_id:id,end_date:today}).then(function(r){
+    writeStatuses[id]=r.success?'Series cancelled':'Error cancelling series';
+    // Remove from local TASKS so it doesn't reappear
+    if (r.success) TASKS=TASKS.filter(function(t){return t.id!==id;});
     render();
-  } else {
-    markCancelled(id);
-  }
+  });
+  render();
 }
-function clearPendingCancel(id){pendingCancel[id]=false;render();}
 
-function markDone(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Completed');render();}
-function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Cancelled');render();}
-function markFreeRoll(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=false;sendToSheet(id,'Free-rolled');render();}
+function markDone(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Completed');render();}
+function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Cancelled');render();}
+function markFreeRoll(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Free-rolled');render();}
 
 function sendToSheet(taskId,status){
   var task=null;

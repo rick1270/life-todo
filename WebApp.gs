@@ -27,6 +27,7 @@ function doGet(e) {
       else if (payload.action === 'logCompletion')   result = logCompletion(payload);
       else if (payload.action === 'logCheckin')      result = logCheckin(payload);
       else if (payload.action === 'getCompletions')  result = getCompletions(payload);
+      else if (payload.action === 'cancelSeries')   result = cancelSeries(payload);
       else if (payload.action === 'ping')            result = { success: true };
       else result = { success: false, error: 'Unknown action' };
       return jsonResponse(result);
@@ -325,6 +326,25 @@ function logCheckin(payload) {
 
   sheet.appendRow(row);
   return { success: true, checkin_id: newId };
+}
+
+// ── CANCEL SERIES ─────────────────────────────────────────────
+// Sets end_date to today on a task, stopping all future occurrences
+function cancelSeries(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Tasks');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col['task_id']]) === String(payload.task_id)) {
+      sheet.getRange(i + 1, col['end_date'] + 1).setValue(payload.end_date);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Task not found' };
 }
 
 // ── 3AM CLEANUP ───────────────────────────────────────────────
