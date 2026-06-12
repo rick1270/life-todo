@@ -10,7 +10,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Field | Value |
 |---|---|
 | Last updated | 2026-06-12 |
-| App version | WebApp.gs v6.1 / index.html v6 |
+| App version | WebApp.gs v6.2 / index.html v6 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
 
@@ -30,7 +30,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 ### Outstanding (Priority Order)
 - [ ] **Metrics tab auto-calculation** — weekly summaries not yet built
-- [ ] **minutes_late** — not calculated for Time-sensitive tasks
+- [x] ~~**minutes_late**~~ — calculated at 3am for Time-sensitive tasks
 - [ ] **Self-Contingent 21-day delay** (Haircut) — not fully implemented
 - [ ] **Xelstrym Remove Patch** — RULE_002 exists but auto-create not wired in app
 
