@@ -1,5 +1,21 @@
 # Task Tracker Changelog
 
+## Session 2026-06-12 (evening)
+
+### Changes
+- WebApp.gs v6.1: fixed completion_rate in midnightCleanup
+  - Was: (completed + freeRolled) / scheduled — inflated rate
+  - Now: completed / scheduled — accurate rate
+- 3am cleanup trigger set in Apps Script (Day timer, 3-4am, GMT-4)
+- README.md moved from Google Sheet ReadMe tab to GitHub
+- CHANGELOG.md confirmed live on GitHub
+- Session continuity now reads from raw.githubusercontent.com
+
+### Decisions
+- GitHub is source of truth for all docs going forward (README, CHANGELOG, DATA_DICTIONARY)
+- ReadMe tab in Google Sheet to be deleted by Rick
+- Completion rate = completed tasks only; free-rolled never counts toward rate
+
 ## Session 2026-06-12 (afternoon)
 
 ### Changes
