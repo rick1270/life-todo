@@ -5,6 +5,9 @@
 - **Never paste code back to the user.** All changes go through clasp push or direct file edits. If code needs to be deployed, use `clasp push` from this repo root.
 - GitHub is the source of truth for all docs (README, CHANGELOG, DATA_DICTIONARY).
 - Never hardcode tasks, questions, or rules — everything loads dynamically from the sheet.
+- **Sheets time cells → always use `getDisplayValues()`, never `getValues()`.** Apps Script bakes the ET→UTC offset into Date objects for Time-type cells — both `Utilities.formatDate(val, TZ, ...)` and `getUTCHours()` return the wrong value (+5h). `getDisplayValues()` returns the string exactly as shown in the sheet.
+- **`setHours(0,0,0,0)` and `getDay()` are banned in Apps Script.** Both use UTC, not the script timezone. Use `Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd')` for today's date and `Utilities.formatDate(date, TZ, 'EEEE')` for day-of-week.
+- **`clasp push` only updates `@HEAD`.** After pushing, go to Apps Script editor → Deploy → Manage deployments → create a new version to update the live `@28` deployment.
 
 ---
 

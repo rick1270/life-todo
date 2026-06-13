@@ -3,7 +3,7 @@
 ## Session 2026-06-13 (night)
 
 ### Changes
-- WebApp.gs v6.5: fixed scheduled_time display once and for all with getDisplayValues()
+- WebApp.gs v6.5: fixed scheduled_time display once and for all with getDisplayValues() ✓ confirmed working
   - Root cause: Apps Script bakes the ET→UTC offset into Date objects when reading
     Time-type Sheets cells, making both Utilities.formatDate(val, TZ, ...) and
     getUTCHours() return UTC hours rather than the cell's displayed value (+5h error)
