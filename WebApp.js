@@ -36,7 +36,9 @@ function doGet(e) {
       else if (payload.action === 'logCompletion')   result = logCompletion(payload);
       else if (payload.action === 'logCheckin')      result = logCheckin(payload);
       else if (payload.action === 'getCompletions')  result = getCompletions(payload);
-      else if (payload.action === 'cancelSeries')   result = cancelSeries(payload);
+      else if (payload.action === 'cancelSeries')    result = cancelSeries(payload);
+      else if (payload.action === 'getTaskNotes')    result = getTaskNotes(payload);
+      else if (payload.action === 'addTaskNote')     result = addTaskNote(payload);
       else if (payload.action === 'ping')            result = { success: true };
       else result = { success: false, error: 'Unknown action' };
       return jsonResponse(result);
@@ -97,7 +99,7 @@ function getTasks() {
       counts_toward_rate: String(r[col['counts_toward_rate']]).toUpperCase() === 'TRUE',
       rollover:         rollover,
       reminder_minutes: r[col['reminder_minutes']] || '',
-      note:             r[col['notes']] || ''
+      instructions:     r[col['notes']] || ''
     });
   }
   return { success: true, tasks: tasks };
@@ -258,6 +260,7 @@ function logCompletion(payload) {
   const lastId = lastRow > 1 ? sheet.getRange(lastRow, 1).getValue() : 'COMP_0000';
   const num = parseInt(String(lastId).replace('COMP_','')) + 1;
   const newId = 'COMP_' + String(num).padStart(4, '0');
+  const notesText = payload.status === 'Completed' ? gatherAndClearTaskNotes(ss, payload.task_id) : '';
   sheet.appendRow([
     newId,
     payload.task_id,
@@ -265,11 +268,71 @@ function logCompletion(payload) {
     payload.task_type,
     Utilities.formatDate(new Date(payload.scheduled_date + 'T12:00:00'), TZ, 'yyyy-MM-dd'),
     payload.completed_at,
-    '',
+    notesText,
     payload.status,
     payload.counted_in_rate ? 'TRUE' : 'FALSE'
   ]);
   return { success: true, completion_id: newId };
+}
+
+// ── TASK NOTES ────────────────────────────────────────────────
+function getTaskNotes(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Task Notes');
+  if (!sheet || sheet.getLastRow() < 2) return { success: true, notes: [] };
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+  const notes = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = data[i];
+    if (String(r[col['task_id']]) === String(payload.task_id)) {
+      notes.push({
+        note_id:    r[col['note_id']],
+        note_text:  String(r[col['note_text']] || ''),
+        created_at: r[col['created_at']] ? Utilities.formatDate(new Date(r[col['created_at']]), TZ, 'M/d h:mm a') : ''
+      });
+    }
+  }
+  return { success: true, notes: notes };
+}
+
+function addTaskNote(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Task Notes');
+  if (!sheet) {
+    sheet = ss.insertSheet('Task Notes');
+    sheet.getRange(1, 1, 1, 4).setValues([['note_id', 'task_id', 'note_text', 'created_at']]);
+  }
+  const lastRow = sheet.getLastRow();
+  const lastId = lastRow > 1 ? sheet.getRange(lastRow, 1).getValue() : 'NOTE_0000';
+  const num = parseInt(String(lastId).replace('NOTE_','')) + 1;
+  const newId = 'NOTE_' + String(num).padStart(4, '0');
+  const now = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
+  sheet.appendRow([newId, payload.task_id, payload.note_text, now]);
+  return { success: true, note_id: newId };
+}
+
+function gatherAndClearTaskNotes(ss, taskId) {
+  const sheet = ss.getSheetByName('Task Notes');
+  if (!sheet || sheet.getLastRow() < 2) return '';
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+  const noteTexts = [];
+  const rowsToDelete = [];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col['task_id']]) === String(taskId)) {
+      noteTexts.push(String(data[i][col['note_text']] || ''));
+      rowsToDelete.push(i + 1);
+    }
+  }
+  for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+    sheet.deleteRow(rowsToDelete[i]);
+  }
+  return noteTexts.join('\n');
 }
 
 // ── GET COMPLETIONS ───────────────────────────────────────────

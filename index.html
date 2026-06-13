@@ -58,7 +58,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .expand-arrow { font-size: 11px; color: #ccc; transition: transform 0.2s; }
 .expand-arrow.open { transform: rotate(180deg); }
 .task-expanded { border-top: 1px solid #f0f0ea; padding: 10px 12px; background: #fafaf7; }
-.task-note-text { font-size: 12px; color: #777; margin-bottom: 8px; line-height: 1.4; }
+.task-note-text { font-size: 12px; color: #777; line-height: 1.4; }
+.notes-section { margin-bottom: 8px; }
+.notes-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #bbb; margin-bottom: 4px; }
+.task-note-entry { font-size: 12px; color: #555; background: #f0f0ea; border-radius: 6px; padding: 5px 8px; margin-bottom: 3px; line-height: 1.4; }
+.note-add-row { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+.note-input { flex: 1; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; color: #111; outline: none; min-width: 0; }
+.write-status { font-size: 11px; color: #aaa; margin-top: 4px; }
 .action-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .action-btn { font-size: 12px; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 500; border: none; }
 .action-btn.primary { color: #085041; background: #E1F5EE; }
@@ -224,7 +230,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="field">
-      <label>Notes (optional)</label>
+      <label>Instructions (optional)</label>
       <input type="text" id="new-notes" placeholder="e.g. Take with food">
     </div>
     <div class="checkbox-row">
@@ -245,6 +251,7 @@ var DAY_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
+var taskNotes={}, notesLoading={}, noteInputs={};
 var completionTimes={}; // taskId → Date object of when task was completed
 var TASKS=[], questions=[], rules=[];
 var viewMode='today', selectedDays=[];
@@ -418,7 +425,7 @@ function cadenceText(t){
     return prefix+' on '+days;
   }
   if (t.repeat==='Once') return 'One-time';
-  if (t.repeat==='Self-Contingent') return (t.note?t.note+' — ':'')+'after completion';
+  if (t.repeat==='Self-Contingent') return (t.instructions?t.instructions+' — ':'')+'after completion';
   return '';
 }
 
@@ -496,15 +503,24 @@ function renderUpcoming(){
 function renderUpcomingTask(t,nextDate){
   var isCheckin=t.type==='Check-in';
   var aptClass=isAptCategory(t.category)?'apt':'';
+  var isExp=expanded[t.id];
   var displayTime=normalizeTime(t.time);
   var meta='<span class="badge '+badgeClass(t.category,t.type)+'">'+(isCheckin?'Check-in':t.category)+'</span>';
   if (t.repeat!=='Daily'){var ds=fmtDate(nextDate);if(displayTime)ds+=', '+displayTime;meta+='<span class="task-time-lbl">'+ds+'</span>';}
   else if (displayTime){meta+='<span class="task-time-lbl">'+displayTime+'</span>';}
-  return '<div class="task-card '+aptClass+'"><div class="task-row">'
+  var exp='';
+  if (isExp){
+    var instructionsHtml=t.instructions?'<div class="notes-section"><div class="notes-label">Instructions</div><div class="task-note-text">'+escapeHtml(t.instructions)+'</div></div>':'';
+    exp='<div class="task-expanded">'+instructionsHtml+renderNotesSection(t.id)+'</div>';
+  }
+  return '<div class="task-card '+aptClass+'" id="card-'+t.id+'">'
+    +'<div class="task-row" onclick="toggleExpand(\''+t.id+'\')">'
     +'<div class="check-box"></div>'
     +'<div class="task-info"><div class="task-name">'+t.name+'</div>'
     +'<div class="task-meta-row">'+meta+'</div>'
-    +'<div class="task-cadence">'+cadenceText(t)+'</div></div></div></div>';
+    +'<div class="task-cadence">'+cadenceText(t)+'</div></div>'
+    +'<span class="expand-arrow '+(isExp?'open':'')+'">&#9660;</span>'
+    +'</div>'+exp+'</div>';
 }
 
 function renderTask(t){
@@ -519,12 +535,12 @@ function renderTask(t){
   if (isExp){
     if (isCheckin){exp=renderCheckinBody(t);}
     else{
-      var note=t.note?'<div class="task-note-text">'+t.note+'</div>':'';
+      var instructionsHtml=t.instructions?'<div class="notes-section"><div class="notes-label">Instructions</div><div class="task-note-text">'+escapeHtml(t.instructions)+'</div></div>':'';
+      var notesHtml=renderNotesSection(t.id);
       var cancelState = pendingCancel[t.id]; // undefined, 'prompt', 'confirm-series'
       var actionRow, confirmRow='';
 
       if (cancelState === 'prompt') {
-        // Step 1: Show Cancel Today vs Cancel Series
         actionRow = '<div class="action-row">'
           +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
           +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
@@ -535,7 +551,6 @@ function renderTask(t){
           +'<button class="action-btn muted" style="padding:6px 14px;color:#A32D2D" onclick="event.stopPropagation();promptCancelSeries(\''+t.id+'\')">Cancel Series</button>'
           +'</div>';
       } else if (cancelState === 'confirm-series') {
-        // Step 2: Confirm series cancel
         actionRow = '<div class="action-row">'
           +'<button class="action-btn muted" onclick="event.stopPropagation();pendingCancel[\''+t.id+'\']=\'prompt\';render()">&#8249; Back</button>'
           +'</div>';
@@ -545,14 +560,13 @@ function renderTask(t){
           +'<button class="action-btn muted" style="padding:6px 14px" onclick="event.stopPropagation();clearPendingCancel(\''+t.id+'\')">No</button>'
           +'</div>';
       } else {
-        // Default action row
         actionRow = '<div class="action-row">'
           +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
           +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
           +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">Cancel</button>'
           +'</div>';
       }
-      exp='<div class="task-expanded">'+note+actionRow+confirmRow
+      exp='<div class="task-expanded">'+instructionsHtml+notesHtml+actionRow+confirmRow
         +(ws?'<div class="write-status">'+ws+'</div>':'')
         +'</div>';
     }
@@ -591,11 +605,64 @@ function renderCheckinBody(t){
   return html;
 }
 
-function toggleExpand(id){expanded[id]=!expanded[id];render();}
+function toggleExpand(id){
+  expanded[id]=!expanded[id];
+  if (expanded[id] && taskNotes[id]===undefined && !notesLoading[id]) loadTaskNotes(id);
+  render();
+}
+
+function loadTaskNotes(id){
+  notesLoading[id]=true;
+  callSheet({action:'getTaskNotes',task_id:id}).then(function(r){
+    notesLoading[id]=false;
+    taskNotes[id]=r.success?r.notes:[];
+    render();
+  });
+}
+
+function escapeHtml(s){
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderNotesSection(id){
+  var html='<div class="notes-section">';
+  if (notesLoading[id]){
+    html+='<div class="task-note-text" style="margin-bottom:6px">Loading notes...</div>';
+  } else if (taskNotes[id] && taskNotes[id].length>0){
+    html+='<div class="notes-label">Notes</div>';
+    taskNotes[id].forEach(function(n){
+      html+='<div class="task-note-entry">'+escapeHtml(n.note_text)+(n.created_at?' <span style="color:#bbb;font-size:10px">'+escapeHtml(n.created_at)+'</span>':'')+'</div>';
+    });
+  }
+  html+='<div class="note-add-row">'
+    +'<input type="text" class="note-input" id="note-input-'+id+'" placeholder="Add a note..." value="'+escapeHtml(noteInputs[id]||'')+'" '
+    +'oninput="noteInputs[\''+id+'\']=this.value" '
+    +'onkeydown="if(event.key===\'Enter\'){event.stopPropagation();addNote(\''+id+'\')}" '
+    +'onclick="event.stopPropagation()">'
+    +'<button class="action-btn muted" style="white-space:nowrap" onclick="event.stopPropagation();addNote(\''+id+'\')">Add Note</button>'
+    +'</div>';
+  html+='</div>';
+  return html;
+}
+
+function addNote(id){
+  var text=(noteInputs[id]||'').trim();
+  if (!text) return;
+  noteInputs[id]='';
+  render(); // clear input immediately
+  callSheet({action:'addTaskNote',task_id:id,note_text:text}).then(function(r){
+    if (r.success){
+      if (!taskNotes[id]) taskNotes[id]=[];
+      taskNotes[id].push({note_id:r.note_id,note_text:text,created_at:''});
+    }
+    render();
+  });
+}
 
 function quickDone(id){
   completions[id]=completions[id]==='done'?null:'done';
-  if(completions[id]==='done'){completionTimes[id]=new Date();sendToSheet(id,'Completed');}
+  if(completions[id]==='done'){completionTimes[id]=new Date();taskNotes[id]=undefined;noteInputs[id]='';sendToSheet(id,'Completed');}
   else{delete completionTimes[id];}
   render();
 }
@@ -627,7 +694,7 @@ function markCancelledSeries(id){
   render();
 }
 
-function markDone(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Completed');render();}
+function markDone(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;taskNotes[id]=undefined;noteInputs[id]='';sendToSheet(id,'Completed');render();}
 function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Cancelled');render();}
 function markFreeRoll(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Free-rolled');render();}
 
