@@ -250,6 +250,12 @@ var DAY_NAMES  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','S
 var DAY_SHORT  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var MONTHS     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+function toLocalDateStr(d) {
+  return d.getFullYear() + '-'
+    + String(d.getMonth()+1).padStart(2,'0') + '-'
+    + String(d.getDate()).padStart(2,'0');
+}
+
 var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
 var taskNotes={}, notesLoading={}, noteInputs={};
 var completionTimes={}; // taskId → Date object of when task was completed
@@ -270,7 +276,7 @@ function callSheet(payload) {
 
 function loadAll() {
   document.getElementById('sync-msg').textContent='Loading...';
-  var today=getViewDate().toISOString().split('T')[0];
+  var today=toLocalDateStr(getViewDate());
   Promise.all([
     callSheet({action:'getTasks'}),
     callSheet({action:'getRules'}),
@@ -683,7 +689,7 @@ function markCancelledSeries(id){
   // Log today as cancelled
   sendToSheet(id,'Cancelled');
   // Set end_date to today in sheet
-  var today=getViewDate().toISOString().split('T')[0];
+  var today=toLocalDateStr(getViewDate());
   writeStatuses[id]='Cancelling series...';
   callSheet({action:'cancelSeries',task_id:id,end_date:today}).then(function(r){
     writeStatuses[id]=r.success?'Series cancelled':'Error cancelling series';
@@ -712,7 +718,7 @@ function sendToSheet(taskId,status){
 
   writeStatuses[taskId]='Saving...';render();
   callSheet({action:'logCompletion',task_id:taskId,task_name:task.name,task_type:task.type||'Flexible',
-    scheduled_date:getViewDate().toISOString().split('T')[0],completed_at:new Date().toLocaleString('en-US'),
+    scheduled_date:toLocalDateStr(getViewDate()),completed_at:new Date().toLocaleString('en-US'),
     status:status,counted_in_rate:countedInRate
   }).then(function(r){writeStatuses[taskId]=r.success?'Saved':'Saved locally';render();});
 }
@@ -729,7 +735,7 @@ function submitCheckin(taskId){
   var answers={};
   qs.forEach(function(q){answers[q.question_id]=checkinAnswers[q.question_id];});
   callSheet({action:'logCheckin',period:period,
-    checkin_date:getViewDate().toISOString().split('T')[0],
+    checkin_date:toLocalDateStr(getViewDate()),
     checkin_time:new Date().toLocaleTimeString('en-US'),answers:answers
   }).then(function(r){
     if (r.success){checkinSubmitted[taskId]=true;completions[taskId]='done';}
@@ -762,7 +768,7 @@ function toggleDay(btn){
 }
 
 function openModal(){
-  var today=new Date().toISOString().split('T')[0];
+  var today=toLocalDateStr(new Date());
   document.getElementById('new-start').value=today;
   document.getElementById('new-end').value='';
   document.getElementById('new-name').value='';

@@ -1,5 +1,22 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (late night)
+
+### Changes
+- index.html v7: added `toLocalDateStr(d)` helper; replaced all `.toISOString().split('T')[0]`
+  calls (which return UTC date, not ET date) across 5 locations:
+  - `loadAll()` — date sent to `getCompletions`
+  - `sendToSheet()` — `scheduled_date` written to Completions
+  - `markCancelledSeries()` — `end_date` sent to cancelSeries
+  - `submitCheckin()` — `checkin_date` written to Check-ins
+  - `openModal()` — default start_date for Add Task form
+  - Root cause: after ~8pm ET, UTC date is already tomorrow; completions stored
+    with wrong date, causing old checked-off tasks to appear on the next day
+
+### Decisions
+- Never use `.toISOString()` for date strings in the frontend — returns UTC, not ET
+- `toLocalDateStr(d)` uses `getFullYear()/getMonth()/getDate()` which are browser-local
+
 ## Session 2026-06-13 (night)
 
 ### Changes
