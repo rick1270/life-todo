@@ -1,6 +1,12 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.4
+// RICK'S TASK TRACKER — WebApp.gs v6.5
 // ============================================================
+// Changes in v6.5:
+// - getTasks: replaced fmtTime() entirely with getDisplayValues() for scheduled_time.
+//   Both Utilities.formatDate(val, TZ, ...) and getUTCHours() on Time-type Sheets cells
+//   give the wrong UTC value (+5h) because Apps Script bakes the ET→UTC offset into the
+//   Date object. getDisplayValues() returns exactly what the cell shows in the sheet,
+//   bypassing all Date/timezone conversion.
 // Changes in v6.4:
 // - getTasks: fmtTime() fixed — Utilities.formatDate(val, TZ, ...) on 1899-epoch
 //   Date objects applies wrong historical timezone offset (+5h); replaced with
@@ -78,6 +84,7 @@ function getTasks() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName('Tasks');
   const data = sheet.getDataRange().getValues();
+  const displayData = sheet.getDataRange().getDisplayValues();
   const headers = data[0];
   const col = {};
   headers.forEach((h, i) => col[h] = i);
@@ -93,15 +100,7 @@ function getTasks() {
       if (val instanceof Date) return Utilities.formatDate(val, TZ, 'yyyy-MM-dd');
       return String(val);
     };
-    const fmtTime = val => {
-      if (!val) return '';
-      if (val instanceof Date) {
-        const h = val.getUTCHours(), m = val.getUTCMinutes();
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + ampm;
-      }
-      return String(val);
-    };
+
 
     const rolloverVal = String(r[col['rollover']]).toUpperCase();
     const rollover = rolloverVal === 'FALSE' ? false : true; // blank = TRUE
@@ -111,7 +110,7 @@ function getTasks() {
       name:             r[col['task_name']],
       category:         r[col['category']],
       type:             r[col['task_type']],
-      time:             fmtTime(r[col['scheduled_time']]),
+      time:             displayData[i][col['scheduled_time']] || '',
       repeat:           r[col['repeat_type']],
       days:             r[col['repeat_day']] || '',
       freq:             parseInt(r[col['repeat_occurrence']]) || 1,

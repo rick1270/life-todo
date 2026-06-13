@@ -1,5 +1,20 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (night)
+
+### Changes
+- WebApp.gs v6.5: fixed scheduled_time display once and for all with getDisplayValues()
+  - Root cause: Apps Script bakes the ET→UTC offset into Date objects when reading
+    Time-type Sheets cells, making both Utilities.formatDate(val, TZ, ...) and
+    getUTCHours() return UTC hours rather than the cell's displayed value (+5h error)
+  - Fix: getTasks now calls sheet.getDataRange().getDisplayValues() and reads
+    displayData[i][col['scheduled_time']] — returns exactly what the sheet cell shows
+  - Removed fmtTime() helper entirely (no longer needed)
+
+### Decisions
+- Never try to extract time from a Sheets Time-type cell Date object — use getDisplayValues()
+- getValues() for dates (need Date objects for comparison); getDisplayValues() for times (need display string)
+
 ## Session 2026-06-13 (evening)
 
 ### Changes
