@@ -1,6 +1,17 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.2
+// RICK'S TASK TRACKER — WebApp.gs v6.3
 // ============================================================
+// Changes in v6.3:
+// - getTasks: fmtTime() helper converts scheduled_time Date objects to 'h:mm a'
+//   string before JSON serialization — fixes 4-hour UTC shift ("3:00 AM" bug)
+// - isTaskScheduledOnDate: day-of-week now via Utilities.formatDate(date, TZ, 'EEEE')
+//   instead of date.getDay() (which uses UTC day, not ET day)
+// - isTaskScheduledOnDate: start/end dates from Sheets normalized through
+//   Utilities.formatDate(val, TZ, 'yyyy-MM-dd') + T12:00:00 before comparison —
+//   fixes midnight-UTC-vs-midnight-ET off-by-one for Once tasks
+// - midnightCleanup rollover: replaced today.setHours(0,0,0,0) (UTC midnight =
+//   8pm ET previous day) with Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') —
+//   fixes start_date reset writing yesterday instead of today
 // Changes in v6.2:
 // - midnightCleanup: calculate minutes_late for Time-sensitive tasks
 //   Compares completed_at to scheduled_time, writes result to Completions sheet
@@ -78,6 +89,11 @@ function getTasks() {
       if (val instanceof Date) return Utilities.formatDate(val, TZ, 'yyyy-MM-dd');
       return String(val);
     };
+    const fmtTime = val => {
+      if (!val) return '';
+      if (val instanceof Date) return Utilities.formatDate(val, TZ, 'h:mm a');
+      return String(val);
+    };
 
     const rolloverVal = String(r[col['rollover']]).toUpperCase();
     const rollover = rolloverVal === 'FALSE' ? false : true; // blank = TRUE
@@ -87,7 +103,7 @@ function getTasks() {
       name:             r[col['task_name']],
       category:         r[col['category']],
       type:             r[col['task_type']],
-      time:             r[col['scheduled_time']] || '',
+      time:             fmtTime(r[col['scheduled_time']]),
       repeat:           r[col['repeat_type']],
       days:             r[col['repeat_day']] || '',
       freq:             parseInt(r[col['repeat_occurrence']]) || 1,
@@ -531,15 +547,13 @@ function midnightCleanup() {
 
     // Handle rollover
     if (rollover) {
-      const today = new Date();
-      today.setHours(0,0,0,0);
+      const todayStr = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+      const today = new Date(todayStr + 'T12:00:00');
       const nextOcc = getNextOccurrenceAfter(r, tCol, today);
       const daysUntilNext = nextOcc ? Math.round((nextOcc - today) / (24*60*60*1000)) : 999;
       if (daysUntilNext > 1) {
         if (repeat === 'Once' || repeat === 'Self-Contingent') {
-          tasksSheet.getRange(i+1, tCol['start_date']+1).setValue(
-            Utilities.formatDate(today, tz, 'yyyy-MM-dd')
-          );
+          tasksSheet.getRange(i+1, tCol['start_date']+1).setValue(todayStr);
         }
       }
     }
@@ -577,12 +591,14 @@ function isTaskScheduledOnDate(r, tCol, date) {
   const repeat  = r[tCol['repeat_type']];
   const days    = r[tCol['repeat_day']] || '';
   const freq    = parseInt(r[tCol['repeat_occurrence']]) || 1;
-  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][date.getDay()];
+  const dayName = Utilities.formatDate(date, TZ, 'EEEE');
 
   const startVal = r[tCol['start_date']];
   const endVal   = r[tCol['end_date']];
-  const start = startVal instanceof Date ? startVal : startVal ? new Date(String(startVal)+'T12:00:00') : null;
-  const end   = endVal   instanceof Date ? endVal   : endVal   ? new Date(String(endVal)+'T12:00:00')   : null;
+  const startStr = startVal instanceof Date ? Utilities.formatDate(startVal, TZ, 'yyyy-MM-dd') : String(startVal || '');
+  const endStr   = endVal   instanceof Date ? Utilities.formatDate(endVal,   TZ, 'yyyy-MM-dd') : String(endVal   || '');
+  const start = startStr ? new Date(startStr + 'T12:00:00') : null;
+  const end   = endStr   ? new Date(endStr   + 'T12:00:00') : null;
 
   if (start && date < start) return false;
   if (end   && date > end)   return false;

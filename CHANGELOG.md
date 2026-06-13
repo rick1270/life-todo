@@ -1,5 +1,39 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (afternoon)
+
+### Changes
+- WebApp.gs v6.3: four timezone/date bugs fixed in midnightCleanup and task scheduling
+
+  **Bug 1 — `today.setHours(0,0,0,0)` was UTC midnight (= 8pm ET previous day)**
+  - Was: Once/Self-Contingent missed tasks had `start_date` reset to yesterday in ET
+  - Now: `Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd')` gives correct ET date string;
+    `new Date(todayStr + 'T12:00:00')` used as base for `getNextOccurrenceAfter`
+  - Affected: rollover logic in `midnightCleanup` lines 533–540
+
+  **Bug 2 — `date.getDay()` used UTC day of week, not ET day**
+  - Was: `['Sunday',...][date.getDay()]` — UTC day, wrong near midnight ET
+  - Now: `Utilities.formatDate(date, TZ, 'EEEE')` — always ET day name
+  - Affected: `isTaskScheduledOnDate` — all repeat types checked against wrong day
+
+  **Bug 3 — `start_date` Date objects from Sheets were raw UTC midnight**
+  - Was: `startVal instanceof Date ? startVal : ...` — raw Date at midnight UTC = previous day ET
+  - Now: normalized via `Utilities.formatDate(startVal, TZ, 'yyyy-MM-dd')` then noon constructor,
+    same as string path — fixes off-by-one for Once task date matching
+  - Affected: `isTaskScheduledOnDate` start/end date comparisons
+
+  **Bug 4 — `scheduled_time` Time cells serialized as UTC ISO strings**
+  - Was: `r[col['scheduled_time']] || ''` — Date objects JSON-serialized to UTC ISO string;
+    frontend displayed in ET, shifting every time 4 hours earlier ("7:00 AM → 3:00 AM")
+  - Now: `fmtTime()` helper converts Date objects via `Utilities.formatDate(val, TZ, 'h:mm a')`
+    before serialization; plain strings passed through unchanged
+  - Affected: `getTasks` — all tasks with time-formatted cells in scheduled_time column
+
+### Decisions
+- All date/time values leaving Apps Script must be formatted strings, never raw Date objects
+- `Utilities.formatDate(..., TZ, ...)` is the only safe way to get ET date/time in Apps Script
+- `setHours(0,0,0,0)` and `getDay()` are banned — both use UTC, not script timezone
+
 ## Session 2026-06-13
 
 ### Changes
