@@ -1,5 +1,21 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-7)
+
+### Changes
+- WebApp.gs v7.2: Rules auto-create implemented
+  - On each 3am run, reads active `Auto-create` rules from Rules tab
+  - When `trigger_task_id` was completed yesterday, sets `start_date` and `active=TRUE`
+    on `target_task_id` using the rule's `contingent_delay` + `contingent_delay_unit`
+  - Target task appears in app on `completion_date + delay`
+  - Rules tab is skipped entirely if sheet is missing or has no data rows
+  - All column access via rCol header map; task lookup via taskRowMap index
+
+### Decisions
+- Target task must already exist in Tasks tab — rule fires it, doesn't create it from scratch
+- Setting active=TRUE allows target tasks to be stored inactive and only surfaced by rules
+- Same delay math as Self-Contingent (Hours/Minutes converted to ceiling-days)
+
 ## Session 2026-06-13 (continued-6)
 
 ### Changes

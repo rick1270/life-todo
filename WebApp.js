@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v7.1
+// RICK'S TASK TRACKER — WebApp.gs v7.2
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -614,6 +614,48 @@ function midnightCleanup() {
     newStart.setDate(newStart.getDate() + delayDays);
     const newStartStr = Utilities.formatDate(newStart, tz, 'yyyy-MM-dd');
     tasksSheet.getRange(i + 1, tCol['start_date'] + 1).setValue(newStartStr);
+  }
+
+  // Rules auto-create: when trigger task completed yesterday, activate target task
+  const rulesSheet = ss.getSheetByName('Rules');
+  if (rulesSheet && rulesSheet.getLastRow() > 1) {
+    const rulesData = rulesSheet.getDataRange().getValues();
+    const rHeaders = rulesData[0];
+    const rCol = {};
+    rHeaders.forEach((h, i) => rCol[h] = i);
+
+    // Index task rows by task_id for fast lookup
+    const taskRowMap = {};
+    for (let i = 1; i < taskData.length; i++) {
+      const tid = String(taskData[i][tCol['task_id']]);
+      if (tid) taskRowMap[tid] = i;
+    }
+
+    for (let i = 1; i < rulesData.length; i++) {
+      const rule = rulesData[i];
+      if (String(rule[rCol['active']]).toUpperCase() !== 'TRUE') continue;
+      if (String(rule[rCol['rule_type']]) !== 'Auto-create') continue;
+
+      const triggerTaskId = String(rule[rCol['trigger_task_id']]);
+      if (completedYesterday[triggerTaskId] !== 'Completed') continue;
+
+      const targetTaskId = String(rule[rCol['target_task_id']]);
+      const targetRowIdx = taskRowMap[targetTaskId];
+      if (targetRowIdx === undefined) continue;
+
+      const delay = parseInt(rule[rCol['contingent_delay']]) || 0;
+      const unit  = String(rule[rCol['contingent_delay_unit']] || 'Days').trim();
+      const delayDays = unit === 'Hours'   ? Math.ceil(delay / 24)
+                      : unit === 'Minutes' ? Math.ceil(delay / 1440)
+                      : delay;
+
+      const newStart = new Date(yesterday);
+      newStart.setDate(newStart.getDate() + delayDays);
+      const newStartStr = Utilities.formatDate(newStart, tz, 'yyyy-MM-dd');
+
+      tasksSheet.getRange(targetRowIdx + 1, tCol['start_date'] + 1).setValue(newStartStr);
+      tasksSheet.getRange(targetRowIdx + 1, tCol['active'] + 1).setValue('TRUE');
+    }
   }
 
   // Write Daily Log row — then on Mondays, also write weekly Metrics
