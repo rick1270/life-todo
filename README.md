@@ -9,7 +9,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Field | Value |
 |---|---|
 | Last updated | 2026-06-13 |
-| App version | WebApp.gs v6.9 / index.html v7.2 |
+| App version | WebApp.gs v7.0 / index.html v7.2 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
 
@@ -32,7 +32,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - minutes_late calculated at 3am for Time-sensitive tasks
 
 ### Outstanding (Priority Order)
-- [ ] **Metrics tab auto-calculation** — weekly summaries not yet built
+- [x] **Metrics tab auto-calculation** — runs Monday 3am, covers Mon–Sun week
 - [ ] **Self-Contingent repeat logic** — after completion, start_date resets so task reappears after delay
 - [ ] **Rules auto-create** — when trigger task completed, show target task per Rules tab
 

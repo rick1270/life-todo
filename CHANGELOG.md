@@ -1,5 +1,26 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-5)
+
+### Changes
+- WebApp.gs v7.0: Metrics tab auto-calculation implemented
+  - New `calculateAndWriteWeeklyMetrics()` function — safe to run manually anytime
+  - Called automatically from `midnightCleanup` every Monday (yesterday = Sunday = end of week)
+  - Aggregates Mon–Sun from Daily Log: avg_completion_rate, total_cancelled,
+    total_free_rolled, total_one_time_rolled, best_day, worst_day
+  - Aggregates from Check-ins: avg_mood (Q01/Q05/Q08), avg_focus (Q02/Q06/Q09),
+    avg_achilles_pain (Q10), checkin_completion (actual / 21 expected per week)
+  - Duplicate guard: skips if Metrics row for that week_start already exists
+  - All column writes use mCol header map — safe against column reorders
+  - `one_time_rolled` counter added to midnightCleanup (was hardcoded 0 in Daily Log)
+
+### Decisions
+- checkin_completion denominator = 21 (3 periods × 7 days). Adjust if check-in
+  schedule changes significantly.
+- med_change and notes columns left blank — manual fields for Lien Turley to fill
+- `calculateAndWriteWeeklyMetrics` can be run manually from Apps Script editor to
+  backfill any missed weeks
+
 ## Session 2026-06-13 (continued-4)
 
 ### Changes

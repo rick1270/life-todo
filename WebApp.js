@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.9
+// RICK'S TASK TRACKER — WebApp.gs v7.0
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -537,7 +537,7 @@ function midnightCleanup() {
     compSheet.getRange(rowIdx, minutesLateCol).setValue(minutesLate > 0 ? minutesLate : 0);
   }
 
-  let scheduled = 0, completed = 0, missed = 0, cancelled = 0, freeRolled = 0, checkins = 0;
+  let scheduled = 0, completed = 0, missed = 0, cancelled = 0, freeRolled = 0, checkins = 0, oneTimeRolled = 0;
   const newCompRows = [];
 
   for (let i = 1; i < taskData.length; i++) {
@@ -581,6 +581,7 @@ function midnightCleanup() {
       if (daysUntilNext > 1) {
         if (repeat === 'One-time' || repeat === 'Self-Contingent') {
           tasksSheet.getRange(i+1, tCol['start_date']+1).setValue(todayStr);
+          if (repeat === 'One-time') oneTimeRolled++;
         }
       }
     }
@@ -592,7 +593,7 @@ function midnightCleanup() {
       .setValues(newCompRows);
   }
 
-  // Write Daily Log row
+  // Write Daily Log row — then on Mondays, also write weekly Metrics
   // FIX v6.1: completion_rate uses completed only, not completed + freeRolled
   // Free-rolled tasks have counted_in_rate=FALSE so must not inflate the rate
   const logLastRow = logSheet.getLastRow();
@@ -601,9 +602,132 @@ function midnightCleanup() {
     const rate = scheduled > 0 ? Math.round(completed / scheduled * 100) + '%' : '0%';
     logSheet.appendRow([
       yesterdayStr, scheduled, completed, cancelled, freeRolled,
-      rate, 0, checkins, '', '', ''
+      rate, oneTimeRolled, checkins, '', '', ''
     ]);
   }
+
+  // Weekly metrics: run on Monday (yesterday = Sunday = end of week)
+  if (Utilities.formatDate(new Date(), TZ, 'EEEE') === 'Monday') {
+    calculateAndWriteWeeklyMetrics();
+  }
+}
+
+// ── WEEKLY METRICS ────────────────────────────────────────────
+// Called automatically from midnightCleanup on Mondays.
+// Also safe to run manually any time — guards against duplicate rows.
+function calculateAndWriteWeeklyMetrics() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const tz = TZ;
+
+  // On Monday 3am: yesterday = Sunday (end of completed week), 6 days back = Monday (start)
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekEndStr   = Utilities.formatDate(yesterday, tz, 'yyyy-MM-dd');
+  const weekStartDay = new Date(yesterday);
+  weekStartDay.setDate(weekStartDay.getDate() - 6);
+  const weekStartStr = Utilities.formatDate(weekStartDay, tz, 'yyyy-MM-dd');
+
+  // Guard: skip if row for this week_start already exists
+  const metricsSheet = ss.getSheetByName('Metrics');
+  if (!metricsSheet) return;
+  const metricsData = metricsSheet.getDataRange().getValues();
+  if (metricsData.length < 1) return;
+  const mHeaders = metricsData[0];
+  const mCol = {};
+  mHeaders.forEach((h, i) => mCol[h] = i);
+  for (let i = 1; i < metricsData.length; i++) {
+    let ws = metricsData[i][mCol['week_start']];
+    if (ws instanceof Date) ws = dateToYMD(ws); else ws = String(ws);
+    if (ws === weekStartStr) return;
+  }
+
+  // ── Daily Log aggregation ─────────────────────────────────
+  const logSheet = ss.getSheetByName('Daily Log');
+  const logData  = logSheet.getDataRange().getValues();
+  const lHeaders = logData[0];
+  const lCol = {};
+  lHeaders.forEach((h, i) => lCol[h] = i);
+
+  let rateSum = 0, rateCount = 0;
+  let totalOneTimeRolled = 0, totalCancelled = 0, totalFreeRolled = 0;
+  let bestRate = -1, worstRate = 101, bestDay = '', worstDay = '';
+
+  for (let i = 1; i < logData.length; i++) {
+    const row = logData[i];
+    let logDate = row[lCol['log_date']];
+    if (logDate instanceof Date) logDate = dateToYMD(logDate); else logDate = String(logDate);
+    if (logDate < weekStartStr || logDate > weekEndStr) continue;
+
+    const rateRaw = parseFloat(String(row[lCol['completion_rate']] || '').replace('%', ''));
+    if (!isNaN(rateRaw)) {
+      rateSum += rateRaw;
+      rateCount++;
+      if (rateRaw > bestRate)  { bestRate  = rateRaw; bestDay  = logDate; }
+      if (rateRaw < worstRate) { worstRate = rateRaw; worstDay = logDate; }
+    }
+    totalOneTimeRolled += parseInt(row[lCol['one_time_rolled']]) || 0;
+    totalCancelled     += parseInt(row[lCol['tasks_cancelled']]) || 0;
+    totalFreeRolled    += parseInt(row[lCol['tasks_free_rolled']]) || 0;
+  }
+  const avgRate = rateCount > 0 ? Math.round(rateSum / rateCount) + '%' : '';
+
+  // ── Check-ins aggregation ─────────────────────────────────
+  const ciSheet = ss.getSheetByName('Check-ins');
+  const ciData  = ciSheet.getDataRange().getValues();
+  const ciHeaders = ciData[0];
+  const ciCol = {};
+  ciHeaders.forEach((h, i) => ciCol[h] = i);
+
+  const moodQs  = ['Q01','Q05','Q08'].filter(q => ciCol[q] !== undefined);
+  const focusQs = ['Q02','Q06','Q09'].filter(q => ciCol[q] !== undefined);
+
+  let moodSum = 0, moodN = 0, focusSum = 0, focusN = 0;
+  let painSum = 0, painN = 0, checkinCount = 0;
+
+  for (let i = 1; i < ciData.length; i++) {
+    const row = ciData[i];
+    let ciDate = row[ciCol['checkin_date']];
+    if (ciDate instanceof Date) ciDate = dateToYMD(ciDate); else ciDate = String(ciDate);
+    if (ciDate < weekStartStr || ciDate > weekEndStr) continue;
+    checkinCount++;
+
+    moodQs.forEach(q => {
+      const v = parseFloat(row[ciCol[q]]);
+      if (!isNaN(v)) { moodSum += v; moodN++; }
+    });
+    focusQs.forEach(q => {
+      const v = parseFloat(row[ciCol[q]]);
+      if (!isNaN(v)) { focusSum += v; focusN++; }
+    });
+    if (ciCol['Q10'] !== undefined) {
+      const v = parseFloat(row[ciCol['Q10']]);
+      if (!isNaN(v)) { painSum += v; painN++; }
+    }
+  }
+
+  const avgMood  = moodN  > 0 ? Math.round(moodSum  / moodN  * 10) / 10 : '';
+  const avgFocus = focusN > 0 ? Math.round(focusSum / focusN * 10) / 10 : '';
+  const avgPain  = painN  > 0 ? Math.round(painSum  / painN  * 10) / 10 : '';
+  // 3 periods × 7 days = 21 expected check-ins per week
+  const checkinCompletion = Math.round(checkinCount / 21 * 100) + '%';
+
+  // ── Write Metrics row ─────────────────────────────────────
+  const newRow = new Array(mHeaders.length).fill('');
+  if (mCol['week_start']            !== undefined) newRow[mCol['week_start']]            = weekStartStr;
+  if (mCol['avg_completion_rate']   !== undefined) newRow[mCol['avg_completion_rate']]   = avgRate;
+  if (mCol['total_one_time_rolled'] !== undefined) newRow[mCol['total_one_time_rolled']] = totalOneTimeRolled;
+  if (mCol['total_cancelled']       !== undefined) newRow[mCol['total_cancelled']]       = totalCancelled;
+  if (mCol['total_free_rolled']     !== undefined) newRow[mCol['total_free_rolled']]     = totalFreeRolled;
+  if (mCol['avg_mood']              !== undefined && avgMood  !== '') newRow[mCol['avg_mood']]              = avgMood;
+  if (mCol['avg_focus']             !== undefined && avgFocus !== '') newRow[mCol['avg_focus']]             = avgFocus;
+  if (mCol['avg_achilles_pain']     !== undefined && avgPain  !== '') newRow[mCol['avg_achilles_pain']]     = avgPain;
+  if (mCol['checkin_completion']    !== undefined) newRow[mCol['checkin_completion']]    = checkinCompletion;
+  if (mCol['best_day']              !== undefined && bestDay)  newRow[mCol['best_day']]  = bestDay;
+  if (mCol['worst_day']             !== undefined && worstDay) newRow[mCol['worst_day']] = worstDay;
+  // med_change and notes left blank — manual fields for Lien Turley
+
+  metricsSheet.appendRow(newRow);
 }
 
 function getLastCompId(compSheet) {
