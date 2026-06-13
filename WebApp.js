@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v7.0
+// RICK'S TASK TRACKER — WebApp.gs v7.1
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -591,6 +591,29 @@ function midnightCleanup() {
   if (newCompRows.length > 0) {
     compSheet.getRange(compSheet.getLastRow()+1, 1, newCompRows.length, newCompRows[0].length)
       .setValues(newCompRows);
+  }
+
+  // Self-Contingent: advance start_date for tasks completed yesterday
+  // New start_date = completion_date + contingent_delay, so task re-appears after the delay
+  for (let i = 1; i < taskData.length; i++) {
+    const r = taskData[i];
+    if (!r[tCol['task_id']]) continue;
+    if (String(r[tCol['active']]).toUpperCase() !== 'TRUE') continue;
+    if (String(r[tCol['repeat_type']]) !== 'Self-Contingent') continue;
+    if (completedYesterday[String(r[tCol['task_id']])] !== 'Completed') continue;
+
+    const delay = parseInt(r[tCol['contingent_delay']]) || 0;
+    if (delay <= 0) continue;
+
+    const unit = String(r[tCol['contingent_delay_unit']] || 'Days').trim();
+    const delayDays = unit === 'Hours' ? Math.ceil(delay / 24)
+                    : unit === 'Minutes' ? Math.ceil(delay / 1440)
+                    : delay;
+
+    const newStart = new Date(yesterday);
+    newStart.setDate(newStart.getDate() + delayDays);
+    const newStartStr = Utilities.formatDate(newStart, tz, 'yyyy-MM-dd');
+    tasksSheet.getRange(i + 1, tCol['start_date'] + 1).setValue(newStartStr);
   }
 
   // Write Daily Log row — then on Mondays, also write weekly Metrics

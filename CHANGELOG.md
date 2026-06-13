@@ -1,5 +1,21 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-6)
+
+### Changes
+- WebApp.gs v7.1: Self-Contingent repeat logic implemented
+  - After a Self-Contingent task is completed, 3am cleanup advances `start_date`
+    by `contingent_delay` (in `contingent_delay_unit`: Days/Hours/Minutes)
+  - New start_date = completion_date + delay → task disappears until that future date
+  - Frontend `isTaskOnDay` for Self-Contingent already uses `date >= start_date`,
+    so no frontend changes needed
+  - If `contingent_delay` is 0 or blank, start_date is not changed (task stays visible)
+  - Hours/Minutes converted to days (ceiling) for start_date advancement
+
+### Decisions
+- Missed Self-Contingent tasks already rolled to today via the existing rollover block
+- Only Completed status triggers the delay reset; Cancelled leaves start_date unchanged
+
 ## Session 2026-06-13 (continued-5)
 
 ### Changes
