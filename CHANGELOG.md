@@ -1,5 +1,17 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-8)
+
+### Changes
+- WebApp.gs v7.3: removed Rules auto-create block from midnightCleanup
+  - Rules tab deleted from sheet — redundant with `contingent_on` + `contingent_delay`
+    on the Tasks tab, which already handles "show task B when task A is completed"
+- CLAUDE.md / README.md: Rules tab and Rules auto-create marked as removed
+
+### Decisions
+- `contingent_on` (TASK_NNN or SELF) + `contingent_delay` covers all trigger-based
+  task visibility. No separate Rules layer needed.
+
 ## Session 2026-06-13 (continued-7)
 
 ### Changes

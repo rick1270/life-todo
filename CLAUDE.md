@@ -48,7 +48,7 @@ appsscript.json
 | Checkin Questions | Add rows only — never delete. `active=FALSE` hides without removing column. |
 | Check-ins | One row per check-in, one column per question. Never delete columns. |
 | Metrics | Weekly summaries for Lien Turley. Not yet auto-calculated. |
-| Rules | Contingent task / medication safety rules. Patterns, not hardcoded features. |
+| ~~Rules~~ | Deleted — redundant with `contingent_on` + `contingent_delay` on Tasks tab. |
 
 ---
 
@@ -101,7 +101,7 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 
 - [ ] **Metrics tab auto-calculation** — weekly summaries from Daily Log; not yet built
 - [ ] **Self-Contingent repeat logic** — after completion, `start_date` resets so task reappears after `contingent_delay`
-- [ ] **Rules auto-create** — when trigger task completed, show/create target task per Rules tab
+- ~~**Rules auto-create**~~ — removed; `contingent_on` + `contingent_delay` on Tasks tab covers this
 
 ---
 
