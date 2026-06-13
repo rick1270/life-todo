@@ -1,6 +1,10 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.3
+// RICK'S TASK TRACKER — WebApp.gs v6.4
 // ============================================================
+// Changes in v6.4:
+// - getTasks: fmtTime() fixed — Utilities.formatDate(val, TZ, ...) on 1899-epoch
+//   Date objects applies wrong historical timezone offset (+5h); replaced with
+//   getUTCHours()/getUTCMinutes() which read raw Sheets time fraction directly
 // Changes in v6.3:
 // - getTasks: fmtTime() helper converts scheduled_time Date objects to 'h:mm a'
 //   string before JSON serialization — fixes 4-hour UTC shift ("3:00 AM" bug)
@@ -91,7 +95,11 @@ function getTasks() {
     };
     const fmtTime = val => {
       if (!val) return '';
-      if (val instanceof Date) return Utilities.formatDate(val, TZ, 'h:mm a');
+      if (val instanceof Date) {
+        const h = val.getUTCHours(), m = val.getUTCMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+      }
       return String(val);
     };
 

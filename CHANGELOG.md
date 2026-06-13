@@ -1,5 +1,19 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (evening)
+
+### Changes
+- WebApp.gs v6.4: fixed fmtTime() regression from v6.3
+  - v6.3 used `Utilities.formatDate(val, TZ, 'h:mm a')` on 1899-epoch Date objects
+    (Sheets time fractions). Apps Script applies wrong historical timezone offset for
+    pre-epoch dates, shifting times +5 hours instead of correcting the original -4h bug.
+  - v6.4 uses `getUTCHours()` / `getUTCMinutes()` directly — Sheets time fractions are
+    stored as UTC-fraction Date objects; UTC hours = the raw time value with no adjustment
+
+### Decisions
+- Never use `Utilities.formatDate` on Date objects from Sheets TIME cells (1899 epoch).
+  Use `getUTCHours()` / `getUTCMinutes()` to read the raw time value instead.
+
 ## Session 2026-06-13 (afternoon)
 
 ### Changes
