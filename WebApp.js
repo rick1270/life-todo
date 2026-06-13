@@ -661,10 +661,12 @@ function calculateAndWriteWeeklyMetrics() {
 
     const rateRaw = parseFloat(String(row[lCol['completion_rate']] || '').replace('%', ''));
     if (!isNaN(rateRaw)) {
-      rateSum += rateRaw;
+      // Sheets auto-converts "20%" strings to decimal 0.2 — normalize to 0-100 scale
+      const rate = rateRaw <= 1 ? rateRaw * 100 : rateRaw;
+      rateSum += rate;
       rateCount++;
-      if (rateRaw > bestRate)  { bestRate  = rateRaw; bestDay  = logDate; }
-      if (rateRaw < worstRate) { worstRate = rateRaw; worstDay = logDate; }
+      if (rate > bestRate)  { bestRate  = rate; bestDay  = logDate; }
+      if (rate < worstRate) { worstRate = rate; worstDay = logDate; }
     }
     totalOneTimeRolled += parseInt(row[lCol['one_time_rolled']]) || 0;
     totalCancelled     += parseInt(row[lCol['tasks_cancelled']]) || 0;
