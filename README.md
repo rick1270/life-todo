@@ -8,7 +8,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-06-12 |
+| Last updated | 2026-06-13 |
 | App version | WebApp.gs v6.2 / index.html v6 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
@@ -24,8 +24,10 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - Today / Upcoming toggle
 - Progress bar (excludes Free-roll and Check-in from rate)
 - Date navigation (Yesterday / Today / Tomorrow)
-- Task Notes display in expanded panel
+- Task Notes display in expanded panel (instructions shown, notes appendable, copied to Completions on done)
 - 3am cleanup trigger active (Day timer, 3-4am, GMT-4)
+- CLAUDE.md in repo — project context, deployment ID, schema, rules for session continuity
+- clasp workflow established — `clasp push` from repo root deploys to existing deployment
 - completion_rate calculated correctly (completed only, not free-rolled)
 - minutes_late calculated at 3am for Time-sensitive tasks
 
@@ -109,7 +111,8 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 ## Session Continuity
 
-At the start of each Claude session:
-1. Claude fetches README.md from GitHub for current state
-2. Claude fetches CHANGELOG.md from GitHub for recent changes and decisions
-3. Claude reads DATA_DICTIONARY.md for schema reference
+At the start of each Claude session, read:
+1. `CLAUDE.md` — deployment ID, rules, schema summary, outstanding items
+2. `README.md` — current state and what works
+3. `CHANGELOG.md` — recent changes and decisions
+4. `DATA_DICTIONARY.md` — full schema reference

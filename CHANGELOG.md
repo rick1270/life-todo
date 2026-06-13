@@ -1,5 +1,20 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13
+
+### Changes
+- CLAUDE.md created — deployment ID, sheet structure, notes design, outstanding items, API actions, key invariants, session continuity instructions, no-paste-code rule
+- clasp workflow established: `clasp push` from repo root deploys WebApp.js + index.html to existing deployment (no new deployment needed)
+- Notes feature confirmed complete:
+  - Task Notes tab: appendable rows per task, `cleared_at` set by 3am cleanup on completion
+  - App: instructions shown in expand panel, notes displayed, addTaskNote action live
+  - On completion: active notes copied into Completions row before clearing
+- README.md and CHANGELOG.md updated to reflect session continuity via CLAUDE.md
+
+### Decisions
+- CLAUDE.md is now the first file Claude reads each session (supersedes raw GitHub URL approach)
+- Never paste code back to the user — all edits go through file tools + clasp push
+
 ## Session 2026-06-12 (evening)
 
 ### Changes
