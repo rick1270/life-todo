@@ -1,5 +1,18 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-3)
+
+### Changes
+- WebApp.gs v6.8: fixed hardcoded column indices in `completedYesterday` loop
+  - Was: `row[4]`, `row[1]`, `row[7]` — assumed fixed column positions for
+    `scheduled_date`, `task_id`, `status`. Any column addition breaks all three silently.
+  - Now: `row[cCol['scheduled_date']]`, `row[cCol['task_id']]`, `row[cCol['status']]`
+  - Also fixed: `scheduled_date` midnight UTC → dateToYMD() same as start_date fix
+
+### Decisions
+- Never use hardcoded column indices against Sheets data — always use the header-mapped
+  `cCol`/`tCol` objects so column additions don't silently break lookups.
+
 ## Session 2026-06-13 (continued-2)
 
 ### Changes

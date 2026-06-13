@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.7
+// RICK'S TASK TRACKER — WebApp.gs v6.8
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -485,12 +485,12 @@ function midnightCleanup() {
   const completionRowIndex = {}; // task_id → sheet row index (1-based)
   for (let i = 1; i < compData.length; i++) {
     const row = compData[i];
-    let sd = row[4];
-    if (sd instanceof Date) sd = Utilities.formatDate(sd, tz, 'yyyy-MM-dd');
+    let sd = row[cCol['scheduled_date']];
+    if (sd instanceof Date) sd = dateToYMD(sd);
     else sd = String(sd);
     if (sd === yesterdayStr) {
-      completedYesterday[row[1]] = row[7]; // task_id → status
-      completionRowIndex[row[1]] = i + 1;  // task_id → sheet row (1-based)
+      completedYesterday[row[cCol['task_id']]] = row[cCol['status']];
+      completionRowIndex[row[cCol['task_id']]] = i + 1;
     }
   }
 
