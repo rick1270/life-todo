@@ -304,7 +304,7 @@ function updateDateDisplay(){
   document.getElementById('date-sub').textContent=dayName+', '+MONTHS[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
 }
 
-function changeDay(dir){offsetDays+=dir;render();}
+function changeDay(dir){offsetDays+=dir;loadAll();}
 
 function setView(mode){
   viewMode=mode;

@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.8
+// RICK'S TASK TRACKER — WebApp.gs v6.9
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -377,15 +377,18 @@ function getCompletions(payload) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName('Completions');
   const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
   const today = payload.date;
   const results = {};
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const taskId = row[1];
-    const status = row[7];
-    let scheduledDate = row[4];
+    const taskId = row[col['task_id']];
+    const status = row[col['status']];
+    let scheduledDate = row[col['scheduled_date']];
     if (scheduledDate instanceof Date) {
-      scheduledDate = Utilities.formatDate(scheduledDate, TZ, 'yyyy-MM-dd');
+      scheduledDate = dateToYMD(scheduledDate);
     } else {
       scheduledDate = String(scheduledDate);
     }

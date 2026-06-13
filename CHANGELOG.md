@@ -1,5 +1,21 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-4)
+
+### Changes
+- index.html v7.2: `changeDay` now calls `loadAll()` instead of `render()`
+  - Was: navigating between days kept stale `completions` in memory. Checking off a task
+    while viewing Yesterday left it marked done in Today's view on navigate-back.
+  - Now: every day navigation triggers a fresh fetch of completions for the new date.
+- WebApp.gs v6.9: `getCompletions` hardcoded indices replaced with cCol lookups
+  - Was: `row[1]`, `row[4]`, `row[7]` assumed fixed column positions
+  - Now: `row[col['task_id']]`, `row[col['scheduled_date']]`, `row[col['status']]`
+  - Also: `scheduled_date` Date objects now use `dateToYMD()` instead of Utilities.formatDate
+
+### Decisions
+- Any function that navigates away from current state must reload server data, not
+  just re-render with stale local state.
+
 ## Session 2026-06-13 (continued-3)
 
 ### Changes
