@@ -1,13 +1,20 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v6.5
+// RICK'S TASK TRACKER — WebApp.gs v6.6
 // ============================================================
+// Changes in v6.6:
+// - dateToYMD() global helper added: extracts UTC date components from a Date object
+//   instead of Utilities.formatDate(val, TZ, ...). Sheets DATE cells are stored as
+//   midnight UTC; formatting midnight UTC in ET gives the previous day (off-by-one).
+//   UTC date components are always correct for any Sheets date cell.
+// - getTasks fmtDate: now uses dateToYMD() — fixes Once task start_date off-by-one
+//   (task appeared scheduled for yesterday, not today).
+// - isTaskScheduledOnDate: startStr/endStr use dateToYMD() — same midnight UTC fix.
+// - midnightCleanup minutes_late: two bugs fixed:
+//   (a) schedTime now from taskDisplayData[i][...] instead of String(Date) —
+//       Date.toString() produces no AM/PM so the regex always failed, minutes_late = null
+//   (b) completedMinutes now from Utilities.formatDate(completedAt, TZ, 'H'/'m') —
+//       getHours() on Apps Script server returns UTC hours, not ET hours
 // Changes in v6.5:
-// - getTasks: replaced fmtTime() entirely with getDisplayValues() for scheduled_time.
-//   Both Utilities.formatDate(val, TZ, ...) and getUTCHours() on Time-type Sheets cells
-//   give the wrong UTC value (+5h) because Apps Script bakes the ET→UTC offset into the
-//   Date object. getDisplayValues() returns exactly what the cell shows in the sheet,
-//   bypassing all Date/timezone conversion.
-// Changes in v6.4:
 // - getTasks: fmtTime() fixed — Utilities.formatDate(val, TZ, ...) on 1899-epoch
 //   Date objects applies wrong historical timezone offset (+5h); replaced with
 //   getUTCHours()/getUTCMinutes() which read raw Sheets time fraction directly
@@ -43,6 +50,13 @@
 const SPREADSHEET_ID = '1Mu8U4Mmn9GnX4CUUKPYaUAOfgY51ily7SQOnDJzXNMU';
 const TZ = 'America/New_York';
 const CALENDAR_ID = 'rick1270@gmail.com';
+
+// Sheets date cells are stored as midnight UTC; Utilities.formatDate(val, TZ, ...) on
+// midnight UTC returns the previous day in ET. Use UTC date components instead.
+function dateToYMD(d) {
+  const m = d.getUTCMonth() + 1, day = d.getUTCDate();
+  return d.getUTCFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+}
 
 function doGet(e) {
   const payloadStr = e.parameter.payload;
@@ -97,7 +111,7 @@ function getTasks() {
 
     const fmtDate = val => {
       if (!val) return '';
-      if (val instanceof Date) return Utilities.formatDate(val, TZ, 'yyyy-MM-dd');
+      if (val instanceof Date) return dateToYMD(val);
       return String(val);
     };
 
@@ -455,6 +469,7 @@ function midnightCleanup() {
   const logSheet   = ss.getSheetByName('Daily Log');
 
   const taskData = tasksSheet.getDataRange().getValues();
+  const taskDisplayData = tasksSheet.getDataRange().getDisplayValues();
   const taskHeaders = taskData[0];
   const tCol = {};
   taskHeaders.forEach((h, i) => tCol[h] = i);
@@ -486,7 +501,7 @@ function midnightCleanup() {
     const r = taskData[i];
     const taskId   = String(r[tCol['task_id']]);
     const taskType = String(r[tCol['task_type']]);
-    const schedTime = String(r[tCol['scheduled_time']] || '').trim();
+    const schedTime = (taskDisplayData[i][tCol['scheduled_time']] || '').trim();
 
     if (taskType !== 'Time-sensitive') continue;
     if (!schedTime) continue;
@@ -508,7 +523,9 @@ function midnightCleanup() {
     if (!completedAtRaw) continue;
     const completedAt = completedAtRaw instanceof Date ? completedAtRaw : new Date(completedAtRaw);
     if (isNaN(completedAt)) continue;
-    const completedMinutes = completedAt.getHours() * 60 + completedAt.getMinutes();
+    const completedH = parseInt(Utilities.formatDate(completedAt, TZ, 'H'));
+    const completedM = parseInt(Utilities.formatDate(completedAt, TZ, 'm'));
+    const completedMinutes = completedH * 60 + completedM;
 
     const minutesLate = Math.max(0, completedMinutes - scheduledMinutes);
 
@@ -602,8 +619,8 @@ function isTaskScheduledOnDate(r, tCol, date) {
 
   const startVal = r[tCol['start_date']];
   const endVal   = r[tCol['end_date']];
-  const startStr = startVal instanceof Date ? Utilities.formatDate(startVal, TZ, 'yyyy-MM-dd') : String(startVal || '');
-  const endStr   = endVal   instanceof Date ? Utilities.formatDate(endVal,   TZ, 'yyyy-MM-dd') : String(endVal   || '');
+  const startStr = startVal instanceof Date ? dateToYMD(startVal) : String(startVal || '');
+  const endStr   = endVal   instanceof Date ? dateToYMD(endVal)   : String(endVal   || '');
   const start = startStr ? new Date(startStr + 'T12:00:00') : null;
   const end   = endStr   ? new Date(endStr   + 'T12:00:00') : null;
 

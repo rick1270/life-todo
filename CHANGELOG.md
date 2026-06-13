@@ -1,5 +1,35 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued)
+
+### Changes
+- WebApp.gs v6.6: two root-cause bugs fixed — same midnight-UTC problem as time cells
+
+  **Bug 1 — Once task not appearing in app (fmtDate off-by-one)**
+  - Was: `fmtDate()` used `Utilities.formatDate(val, TZ, 'yyyy-MM-dd')` on Sheets DATE cells.
+    Sheets stores dates as midnight UTC (not midnight ET). Midnight UTC June 13 = 8pm ET June 12.
+    Formatting midnight UTC in ET gives '2026-06-12' → task's start_date sent as yesterday
+    → frontend isTaskOnDay never matched → Once task invisible.
+  - Now: `dateToYMD(d)` global helper uses `getUTCFullYear/getUTCMonth/getUTCDate`, which
+    always returns June 13 for a midnight UTC June 13 date. Same fix applied to
+    `isTaskScheduledOnDate` startStr/endStr.
+
+  **Bug 2 — minutes_late always blank (two sub-bugs in midnightCleanup)**
+  - Was (a): `schedTime = String(r[tCol['scheduled_time']])` — converts Date object to
+    a JS date string like "Sat Jun 13 2026 09:00:00 GMT+0000"; regex `/(\d+):(\d+)\s*(AM|PM)/i`
+    always fails → `continue` → minutes_late never written.
+  - Now (a): `schedTime = taskDisplayData[i][tCol['scheduled_time']]` — display value is
+    "9:00 AM", regex matches correctly. `taskDisplayData` added alongside `taskData`.
+  - Was (b): `completedAt.getHours()` returns UTC hours on Apps Script server (UTC);
+    9:30 AM ET = 1:30 PM UTC → getHours() = 13 → completedMinutes wildly wrong.
+  - Now (b): `Utilities.formatDate(completedAt, TZ, 'H')` and `'m'` return ET hours/minutes.
+
+### Decisions
+- Sheets DATE cells arrive as midnight UTC — `Utilities.formatDate(val, TZ, 'yyyy-MM-dd')`
+  returns the previous day in ET. Use UTC date components (`getUTCDate()` etc.) instead.
+- `getHours()`/`getMinutes()` are banned for ET time comparisons in Apps Script.
+  Use `Utilities.formatDate(d, TZ, 'H')` / `'m'`.
+
 ## Session 2026-06-13 (late night)
 
 ### Changes
