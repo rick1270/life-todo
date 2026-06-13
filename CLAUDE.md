@@ -110,6 +110,7 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 - `task_id` format: `TASK_NNN` — gaps from deletions are fine; `addTask` uses `max+1`
 - `completion_id` format: `COMP_NNNN`
 - `note_id` format: `NOTE_NNN`
+- `repeat_type` valid values (enforced by sheet data validation): `Daily`, `Weekly`, `One-time`, `Self-Contingent` — code must use these exact strings, not aliases like `Once`
 - `repeat_day`: comma-separated day names, e.g. `Monday,Wednesday,Saturday`
 - Apt tasks: `rollover=FALSE`, auto-calendar, `reminder_minutes=30` default
 - Calendar events tagged `[TaskTracker]`

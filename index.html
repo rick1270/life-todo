@@ -180,7 +180,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <select id="new-repeat" onchange="updateWeeklyFields()">
           <option value="Daily">Daily</option>
           <option value="Weekly" selected>Weekly</option>
-          <option value="Once">Once</option>
+          <option value="One-time">One-time</option>
           <option value="Self-Contingent">Self-Contingent</option>
         </select>
       </div>
@@ -341,7 +341,7 @@ function isTaskOnDay(t,d){
     var weeksDiff=Math.floor((d-start)/(7*24*60*60*1000));
     return weeksDiff%t.freq===0;
   }
-  if (t.repeat==='Once'){var sd=parseDate(t.start_date);return sd&&sd.toDateString()===d.toDateString();}
+  if (t.repeat==='One-time'){var sd=parseDate(t.start_date);return sd&&sd.toDateString()===d.toDateString();}
   if (t.repeat==='Self-Contingent'){var sc=parseDate(t.start_date);return !sc||d>=sc;}
   return false;
 }
@@ -430,7 +430,7 @@ function cadenceText(t){
     var prefix=(!t.freq||t.freq<=1)?'Weekly':'Every '+t.freq+' weeks';
     return prefix+' on '+days;
   }
-  if (t.repeat==='Once') return 'One-time';
+  if (t.repeat==='One-time') return 'One-time';
   if (t.repeat==='Self-Contingent') return (t.instructions?t.instructions+' — ':'')+'after completion';
   return '';
 }

@@ -1,5 +1,18 @@
 # Task Tracker Changelog
 
+## Session 2026-06-13 (continued-2)
+
+### Changes
+- WebApp.gs v6.7 / index.html v7.1: renamed `Once` → `One-time` everywhere to match
+  the sheet's data validation dropdown. The sheet enforces `One-time`; the code had `Once`;
+  tasks added through the sheet were invisible because no repeat type ever matched.
+- CLAUDE.md: added `repeat_type` valid values with note that sheet data validation is
+  authoritative — code must match exactly.
+
+### Decisions
+- Sheet data validation is the source of truth for enum values like `repeat_type`.
+  Never use aliases in code that differ from the sheet's allowed values.
+
 ## Session 2026-06-13 (continued)
 
 ### Changes
