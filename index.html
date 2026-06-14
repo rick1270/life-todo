@@ -141,7 +141,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
-    <h3>Add task</h3>
+    <h3 id="modal-title">Add task</h3>
     <div class="field">
       <label>Task name <span class="req">*</span></label>
       <input type="text" id="new-name" placeholder="e.g. Clean refrigerator">
@@ -177,10 +177,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <div class="field">
         <label>Repeat <span class="req">*</span></label>
-        <select id="new-repeat" onchange="updateWeeklyFields()">
+        <select id="new-repeat" onchange="updateModalFields()">
           <option value="Daily">Daily</option>
-          <option value="Weekly" selected>Weekly</option>
-          <option value="One-time">One-time</option>
+          <option value="Weekly">Weekly</option>
+          <option value="One-time" selected>One-time</option>
           <option value="Self-Contingent">Self-Contingent</option>
         </select>
       </div>
@@ -233,13 +233,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <label>Instructions (optional)</label>
       <input type="text" id="new-notes" placeholder="e.g. Take with food">
     </div>
+    <div class="field-row" id="contingent-delay-fields" style="display:none">
+      <div class="field">
+        <label>Delay</label>
+        <input type="number" id="new-contingent-delay" placeholder="e.g. 21">
+      </div>
+      <div class="field">
+        <label>Unit</label>
+        <select id="new-contingent-unit">
+          <option value="Days" selected>Days</option>
+          <option value="Hours">Hours</option>
+          <option value="Minutes">Minutes</option>
+        </select>
+      </div>
+    </div>
     <div class="checkbox-row">
       <input type="checkbox" id="new-calendar">
       <label for="new-calendar">Add to Google Calendar</label>
     </div>
     <div class="modal-btns">
       <button class="btn-cancel-m" onclick="closeModal()">Cancel</button>
-      <button class="btn-save-m" onclick="saveNewTask()">Add</button>
+      <button class="btn-save-m" id="modal-save-btn" onclick="saveNewTask()">Add</button>
     </div>
   </div>
 </div>
@@ -257,6 +271,7 @@ function toLocalDateStr(d) {
 }
 
 var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
+var editingTaskId=null;
 var taskNotes={}, notesLoading={}, noteInputs={};
 var completionTimes={}; // taskId → Date object of when task was completed
 var TASKS=[], questions=[], rules=[];
@@ -570,6 +585,7 @@ function renderTask(t){
           +'<button class="action-btn primary" onclick="event.stopPropagation();markDone(\''+t.id+'\')">Done</button>'
           +'<button class="action-btn freeroll" onclick="event.stopPropagation();markFreeRoll(\''+t.id+'\')">Free-roll</button>'
           +'<button class="action-btn danger" onclick="event.stopPropagation();confirmCancel(\''+t.id+'\')">Cancel</button>'
+          +'<button class="action-btn muted" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="event.stopPropagation();openEditModal(\''+t.id+'\')">Edit</button>'
           +'</div>';
       }
       exp='<div class="task-expanded">'+instructionsHtml+notesHtml+actionRow+confirmRow
@@ -755,10 +771,12 @@ function onCategoryChange(){
   }
 }
 
-function updateWeeklyFields(){
-  var isWeekly=document.getElementById('new-repeat').value==='Weekly';
+function updateModalFields(){
+  var rep=document.getElementById('new-repeat').value;
+  var isWeekly=rep==='Weekly';
   document.getElementById('days-field').classList.toggle('field-disabled',!isWeekly);
   document.getElementById('freq-field').classList.toggle('field-disabled',!isWeekly);
+  document.getElementById('contingent-delay-fields').style.display=rep==='Self-Contingent'?'':'none';
 }
 
 function toggleDay(btn){
@@ -768,6 +786,9 @@ function toggleDay(btn){
 }
 
 function openModal(){
+  editingTaskId=null;
+  document.getElementById('modal-title').textContent='Add task';
+  document.getElementById('modal-save-btn').textContent='Add';
   var today=toLocalDateStr(new Date());
   document.getElementById('new-start').value=today;
   document.getElementById('new-end').value='';
@@ -776,14 +797,43 @@ function openModal(){
   document.getElementById('new-notes').value='';
   document.getElementById('new-cat').value='Other';
   document.getElementById('new-type').value='Flexible';
-  document.getElementById('new-repeat').value='Weekly';
+  document.getElementById('new-repeat').value='One-time';
   document.getElementById('new-freq').value='1';
   document.getElementById('new-rollover').value='TRUE';
   document.getElementById('new-reminder').value='';
   document.getElementById('new-calendar').checked=false;
+  document.getElementById('new-contingent-delay').value='';
+  document.getElementById('new-contingent-unit').value='Days';
   selectedDays=[];
   document.querySelectorAll('.day-btn').forEach(function(b){b.classList.remove('sel');});
-  updateWeeklyFields();
+  updateModalFields();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openEditModal(id){
+  var t=TASKS.find(function(x){return x.id===id;});
+  if (!t) return;
+  editingTaskId=id;
+  document.getElementById('modal-title').textContent='Edit task';
+  document.getElementById('modal-save-btn').textContent='Save';
+  document.getElementById('new-name').value=t.name;
+  document.getElementById('new-cat').value=t.category||'Other';
+  document.getElementById('new-type').value=t.type||'Flexible';
+  document.getElementById('new-time').value=t.time||'';
+  document.getElementById('new-repeat').value=t.repeat||'One-time';
+  document.getElementById('new-freq').value=t.freq||1;
+  document.getElementById('new-start').value=t.start_date||'';
+  document.getElementById('new-end').value=t.end_date||'';
+  document.getElementById('new-rollover').value=t.rollover?'TRUE':'FALSE';
+  document.getElementById('new-reminder').value=t.reminder_minutes||'';
+  document.getElementById('new-notes').value=t.instructions||'';
+  document.getElementById('new-contingent-delay').value=t.contingent_delay||'';
+  document.getElementById('new-contingent-unit').value=t.contingent_delay_unit||'Days';
+  selectedDays=t.days?t.days.split(',').map(function(d){return d.trim();}):[];
+  document.querySelectorAll('.day-btn').forEach(function(b){
+    b.classList.toggle('sel',selectedDays.indexOf(b.dataset.day)>-1);
+  });
+  updateModalFields();
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
@@ -794,8 +844,9 @@ function saveNewTask(){
   var rep=document.getElementById('new-repeat').value;
   if (rep==='Weekly'&&!selectedDays.length){alert('Pick at least one day');return;}
   var cat=document.getElementById('new-cat').value;
+  var conOn=rep==='Self-Contingent'?'SELF':'';
   var payload={
-    action:'addTask',name:name,category:cat,
+    action:editingTaskId?'updateTask':'addTask',name:name,category:cat,
     type:document.getElementById('new-type').value,
     time:normalizeTime(document.getElementById('new-time').value.trim()),
     repeat:rep,days:selectedDays.join(', '),
@@ -805,10 +856,14 @@ function saveNewTask(){
     rollover:document.getElementById('new-rollover').value,
     reminder_minutes:document.getElementById('new-reminder').value,
     note:document.getElementById('new-notes').value.trim(),
-    add_to_calendar:document.getElementById('new-calendar').checked
+    add_to_calendar:document.getElementById('new-calendar').checked,
+    contingent_on:conOn,
+    contingent_delay:document.getElementById('new-contingent-delay').value,
+    contingent_delay_unit:document.getElementById('new-contingent-unit').value
   };
+  if (editingTaskId) payload.task_id=editingTaskId;
   closeModal();
-  document.getElementById('sync-msg').textContent='Saving task...';
+  document.getElementById('sync-msg').textContent=editingTaskId?'Saving changes...':'Saving task...';
   callSheet(payload).then(function(r){
     if (r.success){document.getElementById('sync-msg').textContent='Reloading...';loadAll();}
     else{document.getElementById('sync-msg').textContent='Error saving task';}

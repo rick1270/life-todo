@@ -66,6 +66,7 @@ function doGet(e) {
       let result;
       if      (payload.action === 'getTasks')        result = getTasks();
       else if (payload.action === 'addTask')         result = addTask(payload);
+      else if (payload.action === 'updateTask')     result = updateTask(payload);
       else if (payload.action === 'getRules')        result = getRules();
       else if (payload.action === 'getQuestions')    result = getQuestions();
       else if (payload.action === 'logCompletion')   result = logCompletion(payload);
@@ -176,9 +177,9 @@ function addTask(payload) {
   row[col['repeat_occurrence']]     = payload.freq || 1;
   row[col['start_date']]            = payload.start_date || Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
   row[col['end_date']]              = payload.end_date || '';
-  row[col['contingent_on']]         = '';
-  row[col['contingent_delay']]      = '';
-  row[col['contingent_delay_unit']] = '';
+  row[col['contingent_on']]         = payload.contingent_on || '';
+  row[col['contingent_delay']]      = payload.contingent_delay || '';
+  row[col['contingent_delay_unit']] = payload.contingent_delay_unit || '';
   row[col['counts_toward_rate']]    = payload.type === 'Check-in' ? 'FALSE' : 'TRUE';
   row[col['rollover']]              = rollover ? 'TRUE' : 'FALSE';
   row[col['reminder_minutes']]      = payload.reminder_minutes || '';
@@ -206,7 +207,71 @@ function addTask(payload) {
     }
   }
 
+  // Create same-day alarm for any task with a scheduled time
+  const todayStr = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  if (payload.time && payload.start_date === todayStr) {
+    try {
+      createAlarmEvent({
+        name:             payload.name,
+        date:             payload.start_date,
+        time:             payload.time,
+        reminder_minutes: payload.reminder_minutes || 0
+      });
+    } catch(e) {}
+  }
+
   return { success: true, task_id: newId };
+}
+
+// ── UPDATE TASK ───────────────────────────────────────────────
+function updateTask(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Tasks');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col['task_id']]) !== String(payload.task_id)) continue;
+
+    const rowNum = i + 1;
+    const isApt = String(payload.category).toLowerCase().indexOf('apt') > -1;
+    const rollover = isApt ? false : (payload.rollover === true || payload.rollover === 'TRUE');
+
+    const updates = {
+      task_name:             payload.name,
+      category:              payload.category,
+      task_type:             payload.type,
+      scheduled_time:        payload.time || '',
+      time_tracking:         isApt ? 'Strict' : 'None',
+      repeat_type:           payload.repeat,
+      repeat_day:            payload.days || '',
+      repeat_occurrence:     payload.freq || 1,
+      start_date:            payload.start_date || '',
+      end_date:              payload.end_date || '',
+      contingent_delay:      payload.contingent_delay || '',
+      contingent_delay_unit: payload.contingent_delay_unit || '',
+      counts_toward_rate:    payload.type === 'Check-in' ? 'FALSE' : 'TRUE',
+      rollover:              rollover ? 'TRUE' : 'FALSE',
+      reminder_minutes:      payload.reminder_minutes || '',
+      notes:                 payload.note || ''
+    };
+
+    Object.keys(updates).forEach(function(field) {
+      if (col[field] !== undefined) {
+        sheet.getRange(rowNum, col[field] + 1).setValue(updates[field]);
+      }
+    });
+
+    // contingent_on: only update if payload sends a value (preserve sheet-managed cross-task deps)
+    if (payload.contingent_on) {
+      sheet.getRange(rowNum, col['contingent_on'] + 1).setValue(payload.contingent_on);
+    }
+
+    return { success: true };
+  }
+  return { success: false, error: 'Task not found: ' + payload.task_id };
 }
 
 // ── CREATE CALENDAR EVENT ─────────────────────────────────────
@@ -237,6 +302,30 @@ function createCalendarEvent(t) {
   }
 
   cal.createEvent(title, start, end, options);
+}
+
+// ── CREATE ALARM EVENT ───────────────────────────────────────
+// [TaskAlarm] events are created daily for tasks with scheduled_time.
+// Deleted next 3am. Separate from persistent [TaskTracker] events (Apt/add_to_calendar).
+function createAlarmEvent(t) {
+  const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+  if (!cal || !t.time) return;
+
+  const dateStr = t.date || Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const timeParts = t.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!timeParts) return;
+
+  let hour = parseInt(timeParts[1]);
+  const min = parseInt(timeParts[2]);
+  if (timeParts[3].toUpperCase() === 'PM' && hour !== 12) hour += 12;
+  if (timeParts[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
+
+  const dp = dateStr.split('-');
+  const start = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]), hour, min);
+  const end   = new Date(start.getTime() + 30*60*1000);
+
+  const reminderMin = parseInt(t.reminder_minutes) || 0;
+  cal.createEvent('[TaskAlarm] ' + t.name, start, end, { popupMinutes: reminderMin });
 }
 
 // ── GET RULES ─────────────────────────────────────────────────
@@ -615,6 +704,33 @@ function midnightCleanup() {
     const newStartStr = Utilities.formatDate(newStart, tz, 'yyyy-MM-dd');
     tasksSheet.getRange(i + 1, tCol['start_date'] + 1).setValue(newStartStr);
   }
+
+  // Delete yesterday's [TaskAlarm] events and create today's
+  try {
+    const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+    const yStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0);
+    const yEnd   = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
+    cal.getEvents(yStart, yEnd).forEach(function(e) {
+      if (e.getTitle().indexOf('[TaskAlarm]') === 0) e.deleteEvent();
+    });
+
+    const today = new Date();
+    const todayAlarmStr = Utilities.formatDate(today, tz, 'yyyy-MM-dd');
+    for (let i = 1; i < taskData.length; i++) {
+      const r = taskData[i];
+      if (!r[tCol['task_id']]) continue;
+      if (String(r[tCol['active']]).toUpperCase() !== 'TRUE') continue;
+      const schedTime = (taskDisplayData[i][tCol['scheduled_time']] || '').trim();
+      if (!schedTime) continue;
+      if (!isTaskScheduledOnDate(r, tCol, today)) continue;
+      createAlarmEvent({
+        name:             r[tCol['task_name']],
+        date:             todayAlarmStr,
+        time:             schedTime,
+        reminder_minutes: r[tCol['reminder_minutes']] || 0
+      });
+    }
+  } catch(e) {}
 
   // Write Daily Log row — then on Mondays, also write weekly Metrics
   // FIX v6.1: completion_rate uses completed only, not completed + freeRolled

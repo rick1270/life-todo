@@ -7,7 +7,7 @@
 - Never hardcode tasks, questions, or rules — everything loads dynamically from the sheet.
 - **Sheets time cells → always use `getDisplayValues()`, never `getValues()`.** Apps Script bakes the ET→UTC offset into Date objects for Time-type cells — both `Utilities.formatDate(val, TZ, ...)` and `getUTCHours()` return the wrong value (+5h). `getDisplayValues()` returns the string exactly as shown in the sheet.
 - **`setHours(0,0,0,0)` and `getDay()` are banned in Apps Script.** Both use UTC, not the script timezone. Use `Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd')` for today's date and `Utilities.formatDate(date, TZ, 'EEEE')` for day-of-week.
-- **`clasp push` only updates `@HEAD`.** After pushing, go to Apps Script editor → Deploy → Manage deployments → create a new version to update the live deployment (currently @30; increment each push).
+- **`clasp push` only updates `@HEAD`.** After pushing, go to Apps Script editor → Deploy → Manage deployments → create a new version to update the live deployment (currently @41).
 
 ---
 
@@ -21,8 +21,32 @@
 | Calendar ID | `rick1270@gmail.com` |
 | Timezone | `America/New_York` |
 | Trigger | 3am cleanup — Day timer, 3–4am, GMT-4 |
+| Production URL | `https://script.google.com/macros/s/AKfycbwbxtLqIOT17tzeKTY9GNIiWqKgRgKiJD8CY54oWB5BBCCoEdszaICT75vDqJbRzRprxA/exec` |
+| Test/Dev URL | `https://script.google.com/macros/s/AKfycbwbxtLqIOT17tzeKTY9GNIiWqKgRgKiJD8CY54oWB5BBCCoEdszaICT75vDqJbRzRprxA/dev` |
 
-To deploy after changes: `clasp push` (from repo root). Changes take effect at the existing deployment URL — do not create a new deployment unless the old one is broken.
+---
+
+## Development Workflow
+
+**Two environments, one script project:**
+
+| Environment | URL suffix | Code version | Use for |
+|---|---|---|---|
+| Production | `/exec` | @41 (stable, numbered) | Daily use on phone |
+| Dev/Test | `/dev` | @HEAD (latest push) | Testing new features |
+
+**Standard workflow:**
+1. Create a feature branch in git
+2. Make changes, `clasp push` (updates @HEAD only)
+3. Test on the `/dev` URL — same spreadsheet, runs HEAD
+4. When satisfied: merge branch to `main`
+5. Apps Script editor → Deploy → Manage deployments → new version (increment number)
+6. Production `/exec` URL now serves the new version
+
+**Rules for the dev environment:**
+- Never manually trigger `midnightCleanup` from the Apps Script editor while testing — it writes to the live spreadsheet and will corrupt today's data
+- Schema changes (new columns) must be added to the sheet before pushing code that reads them
+- The `/dev` URL requires being logged in as the script owner — it won't work for other users
 
 ---
 
@@ -47,7 +71,7 @@ appsscript.json
 | Daily Log | One row per day, written at 3am. |
 | Checkin Questions | Add rows only — never delete. `active=FALSE` hides without removing column. |
 | Check-ins | One row per check-in, one column per question. Never delete columns. |
-| Metrics | Weekly summaries for Lien Turley. Not yet auto-calculated. |
+| Metrics | Weekly summaries for Lien Turley. Auto-calculated Monday 3am by `calculateAndWriteWeeklyMetrics()`. |
 | ~~Rules~~ | Deleted — redundant with `contingent_on` + `contingent_delay` on Tasks tab. |
 
 ---
@@ -70,6 +94,7 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 |---|---|
 | `getTasks` | All active tasks |
 | `addTask` | Write new task to Tasks tab |
+| `updateTask` | Update existing task row by `task_id` |
 | `getRules` | Rules tab |
 | `getQuestions` | Checkin Questions tab |
 | `logCompletion` | Write row to Completions tab |
@@ -99,9 +124,12 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 
 ## Outstanding Items (Priority Order)
 
-- [ ] **Metrics tab auto-calculation** — weekly summaries from Daily Log; not yet built
-- [ ] **Self-Contingent repeat logic** — after completion, `start_date` resets so task reappears after `contingent_delay`
+- [x] **Metrics tab auto-calculation** — runs Monday 3am, averages completion rate + check-in scores for the week
+- [x] **Self-Contingent repeat logic** — `start_date` resets after completion by `contingent_delay` days
 - ~~**Rules auto-create**~~ — removed; `contingent_on` + `contingent_delay` on Tasks tab covers this
+- [x] **Edit task** — Edit button on task card, opens modal pre-filled, saves via `updateTask` action
+- [ ] **v0.3 Fitness tracker** — Strava / Fitbod integration
+- [ ] **v0.4 Health dashboard** — TCX, sleep, steps
 
 ---
 
@@ -113,7 +141,7 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 - `repeat_type` valid values (enforced by sheet data validation): `Daily`, `Weekly`, `One-time`, `Self-Contingent` — code must use these exact strings, not aliases like `Once`
 - `repeat_day`: comma-separated day names, e.g. `Monday,Wednesday,Saturday`
 - Apt tasks: `rollover=FALSE`, auto-calendar, `reminder_minutes=30` default
-- Calendar events tagged `[TaskTracker]`
+- Calendar events: `[TaskTracker]` = persistent (Apt/add_to_calendar, never deleted); `[TaskAlarm]` = daily reminder (all tasks with scheduled_time, deleted at next 3am)
 - Contingent task time displayed as `parent_completion_time + delay`, not `scheduled_time`
 - Cancel Today = logs Cancelled for today only; Cancel Series = logs Cancelled + sets `end_date=today`
 
