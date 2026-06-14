@@ -82,8 +82,13 @@ function doGet(e) {
       return jsonResponse({ success: false, error: err.message });
     }
   }
+  let env = 'PROD';
+  try {
+    const svcUrl = ScriptApp.getService().getUrl();
+    if (svcUrl && svcUrl.endsWith('/dev')) env = 'DEV';
+  } catch(err) {}
   const html = HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('Task Tracker')
+    .setTitle('Life To Do - ' + env)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
   return html;
 }
