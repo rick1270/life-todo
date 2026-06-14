@@ -8,7 +8,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-06-13 |
+| Last updated | 2026-06-14 |
 | App version | WebApp.gs v7.3 / index.html v7.2 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
@@ -62,7 +62,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Checkin Questions | Questions shown during check-ins. Add new rows, never delete. |
 | Check-ins | One row per check-in. One column per question. Never delete columns. |
 | Metrics | Weekly summaries. Intended for sharing with Lien Turley. |
-| Rules | Contingent task and medication safety rules. |
+| ~~Rules~~ | Deleted — covered by `contingent_on` + `contingent_delay` on Tasks. |
 
 **Spreadsheet ID:** `1Mu8U4Mmn9GnX4CUUKPYaUAOfgY51ily7SQOnDJzXNMU`
 
@@ -102,7 +102,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | Version | Focus |
 |---|---|
 | v0.1 ✅ | MVP — sheet structure, PWA, calendar script |
-| v0.2 🔄 | Metrics tab, Self-Contingent repeat, Rules auto-create |
+| v0.2 ✅ | Metrics tab, Self-Contingent repeat (Rules removed as redundant) |
 | v0.3 | Fitness tracker integration (Strava / Fitbod) |
 | v0.4 | Health dashboard — TCX, sleep, steps |
 | v1.0 | Full integration. Metrics for Lien Turley. |
