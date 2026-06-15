@@ -154,3 +154,4 @@ At the start of each session, read:
 1. `README.md` — current state and what works
 2. `CHANGELOG.md` — recent changes and decisions
 3. `DATA_DICTIONARY.md` — full schema reference
+4. **`Bugs_Features` tab** — read via Google Drive MCP (`Spreadsheet ID` above) and summarize any open items (Status = `Needed` or `Hold`) for the user

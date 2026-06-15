@@ -685,7 +685,7 @@ function addNote(id){
 function quickDone(id){
   completions[id]=completions[id]==='done'?null:'done';
   if(completions[id]==='done'){completionTimes[id]=new Date();taskNotes[id]=undefined;noteInputs[id]='';sendToSheet(id,'Completed');}
-  else{delete completionTimes[id];}
+  else{delete completionTimes[id];sendToSheet(id,'Uncompleted');}
   render();
 }
 function confirmCancel(id){
@@ -754,7 +754,7 @@ function submitCheckin(taskId){
     checkin_date:toLocalDateStr(getViewDate()),
     checkin_time:new Date().toLocaleTimeString('en-US'),answers:answers
   }).then(function(r){
-    if (r.success){checkinSubmitted[taskId]=true;completions[taskId]='done';}
+    if (r.success){checkinSubmitted[taskId]=true;completions[taskId]='done';expanded[taskId]=false;}
     else if (statusEl) statusEl.textContent='Error saving';
     render();
   });

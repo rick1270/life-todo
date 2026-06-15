@@ -487,7 +487,9 @@ function getCompletions(payload) {
       scheduledDate = String(scheduledDate);
     }
     if (scheduledDate === today && taskId) {
-      results[taskId] = status === 'Cancelled' ? 'cancelled' : 'done';
+      if (status === 'Cancelled') results[taskId] = 'cancelled';
+      else if (status === 'Uncompleted') delete results[taskId];
+      else results[taskId] = 'done';
     }
   }
   return { success: true, completions: results };

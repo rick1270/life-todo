@@ -1,5 +1,22 @@
 # Task Tracker Changelog
 
+## Session 2026-06-15 (continued)
+
+### Changes
+- `index.html`: `quickDone()` now writes `Uncompleted` status to sheet when unchecking a task
+  - Was: toggle to null did nothing to the sheet; reload re-fetched Completed → task appeared done again
+  - Fix: `sendToSheet(id,'Uncompleted')` on uncheck; `getCompletions` now maps `Uncompleted` → `delete results[taskId]` so last row per task wins
+- `index.html`: `submitCheckin()` now sets `expanded[taskId]=false` on success
+  - Was: card stayed open showing "Check-in saved" even though completions[id]='done' was set
+  - Fix: collapse card on successful submit so it clears like other completed tasks
+- `WebApp.js`: `getCompletions` updated to handle `Uncompleted` status
+  - `Cancelled` → 'cancelled', `Uncompleted` → delete key, anything else → 'done'
+
+### Decisions
+- Completions tab stays append-only; `Uncompleted` is a valid event row. Last row per task_id+date wins.
+- `SCRIPT_URL` in index.html is hardcoded to `/exec` — even on the `/dev` URL, all API calls hit production. Backend fixes must be deployed to `/exec` to take effect; testing on `/dev` only validates frontend changes.
+- Bugs_Features: both bugs marked Fixed in sheet. Deployed as new production version.
+
 ## Session 2026-06-15
 
 ### Changes
