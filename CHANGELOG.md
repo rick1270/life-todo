@@ -1,5 +1,20 @@
 # Task Tracker Changelog
 
+## Session 2026-06-15
+
+### Changes
+- `index.html`: `getViewDate()` now normalizes to noon (`setHours(12,0,0,0)`)
+  - `parseDate()` returns noon for date strings (`T12:00:00`); view date was current time
+  - Tasks with `start_date = today` were invisible before noon — start_date check `d < s` failed
+  - Fix: align both sides of the comparison to noon; browser `setHours` is local time (not banned)
+- `Bugs_Features` tab added to spreadsheet — tracks bugs and feature requests (Date, Type, Issue, Status)
+- CLAUDE.md: added Bug/feature report UI to Outstanding Items (future feature)
+- Deployed as new version (production updated)
+
+### Decisions
+- TASK_029 ("Get Chili Seasoning") had blank task_id (accidentally deleted) — fixed manually in sheet
+- TASK_029 start_date was 2026-06-14 (missed rollover since it had no task_id at 3am) — updated to 2026-06-15 in sheet
+
 ## Session 2026-06-13 (continued-8)
 
 ### Changes

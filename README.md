@@ -8,8 +8,8 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-06-14 |
-| App version | WebApp.gs v7.3 / index.html v7.2 |
+| Last updated | 2026-06-15 |
+| App version | WebApp.gs v7.3 / index.html v7.3 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
 
@@ -35,6 +35,9 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 - [x] **Metrics tab auto-calculation** — runs Monday 3am, covers Mon–Sun week
 - [x] **Self-Contingent repeat logic** — start_date advances by contingent_delay after completion
 - ~~**Rules auto-create**~~ — removed; `contingent_on` + `contingent_delay` on Tasks covers this
+- [ ] **v0.3 Fitness tracker** — Strava / Fitbod integration
+- [ ] **v0.4 Health dashboard** — TCX, sleep, steps
+- [ ] **Bug/feature report UI** — in-app form writing to Bugs_Features tab
 
 ---
 
