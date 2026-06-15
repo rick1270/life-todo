@@ -310,7 +310,7 @@ function loadAll() {
   });
 }
 
-function getViewDate(){var d=new Date();d.setDate(d.getDate()+offsetDays);return d;}
+function getViewDate(){var d=new Date();d.setDate(d.getDate()+offsetDays);d.setHours(12,0,0,0);return d;}
 
 function updateDateDisplay(){
   var d=getViewDate(),dayName=DAY_NAMES[d.getDay()];
