@@ -108,6 +108,7 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 | v0.2 ✅ | Metrics tab, Self-Contingent repeat (Rules removed as redundant) |
 | v0.3 | Fitness tracker integration (Strava / Fitbod) |
 | v0.4 | Health dashboard — TCX, sleep, steps |
+| v0.5 | TWA (Trusted Web Activity) — Android Play Store listing wrapping the existing PWA; requires custom domain pointed at GAS deployment |
 | v1.0 | Full integration. Metrics for Lien Turley. |
 
 ---

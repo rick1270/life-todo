@@ -130,6 +130,7 @@ Task Notes is a separate tab (not a column on Tasks). Design decisions:
 - [x] **Edit task** — Edit button on task card, opens modal pre-filled, saves via `updateTask` action
 - [ ] **v0.3 Fitness tracker** — Strava / Fitbod integration
 - [ ] **v0.4 Health dashboard** — TCX, sleep, steps
+- [ ] **v0.5 TWA (Android)** — Trusted Web Activity wrapping the PWA; requires custom domain pointed at GAS deployment; publishes to Play Store
 - [ ] **Bug/feature report UI** — in-app form to submit bugs and feature requests; writes to `Bugs_Features` tab; fields: Date, Type (Bug/Feat), Issue, Status (default: Needed/Hold)
 
 ---
