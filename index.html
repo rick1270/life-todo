@@ -754,7 +754,7 @@ function submitCheckin(taskId){
     checkin_date:toLocalDateStr(getViewDate()),
     checkin_time:new Date().toLocaleTimeString('en-US'),answers:answers
   }).then(function(r){
-    if (r.success){checkinSubmitted[taskId]=true;completions[taskId]='done';expanded[taskId]=false;}
+    if (r.success){checkinSubmitted[taskId]=true;completions[taskId]='done';expanded[taskId]=false;sendToSheet(taskId,'Completed');}
     else if (statusEl) statusEl.textContent='Error saving';
     render();
   });

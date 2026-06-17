@@ -419,10 +419,18 @@ function getTaskNotes(payload) {
   for (let i = 1; i < data.length; i++) {
     const r = data[i];
     if (String(r[col['task_id']]) === String(payload.task_id)) {
+      let createdAt = '';
+      try {
+        const raw = r[col['created_at']];
+        if (raw) {
+          const d = raw instanceof Date ? raw : new Date(String(raw).replace(' ', 'T'));
+          if (!isNaN(d.getTime())) createdAt = Utilities.formatDate(d, TZ, 'M/d h:mm a');
+        }
+      } catch(e) {}
       notes.push({
         note_id:    r[col['note_id']],
         note_text:  String(r[col['note_text']] || ''),
-        created_at: r[col['created_at']] ? Utilities.formatDate(new Date(r[col['created_at']]), TZ, 'M/d h:mm a') : ''
+        created_at: createdAt
       });
     }
   }
@@ -440,8 +448,7 @@ function addTaskNote(payload) {
   const lastId = lastRow > 1 ? sheet.getRange(lastRow, 1).getValue() : 'NOTE_0000';
   const num = parseInt(String(lastId).replace('NOTE_','')) + 1;
   const newId = 'NOTE_' + String(num).padStart(4, '0');
-  const now = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
-  sheet.appendRow([newId, payload.task_id, payload.note_text, now]);
+  sheet.appendRow([newId, payload.task_id, payload.note_text, new Date()]);
   return { success: true, note_id: newId };
 }
 
