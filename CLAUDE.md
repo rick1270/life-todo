@@ -7,7 +7,7 @@
 - Never hardcode tasks, questions, or rules — everything loads dynamically from the sheet.
 - **Sheets time cells → always use `getDisplayValues()`, never `getValues()`.** Apps Script bakes the ET→UTC offset into Date objects for Time-type cells — both `Utilities.formatDate(val, TZ, ...)` and `getUTCHours()` return the wrong value (+5h). `getDisplayValues()` returns the string exactly as shown in the sheet.
 - **`setHours(0,0,0,0)` and `getDay()` are banned in Apps Script.** Both use UTC, not the script timezone. Use `Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd')` for today's date and `Utilities.formatDate(date, TZ, 'EEEE')` for day-of-week.
-- **`clasp push` only updates `@HEAD`.** After pushing, go to Apps Script editor → Deploy → Manage deployments → create a new version to update the live deployment (currently @41).
+- **`clasp push` only updates `@HEAD`.** To deploy to production, run `clasp deploy --deploymentId <ID> --description "..."` — this updates the live deployment in one step without needing the Apps Script UI. Current live version: @45.
 
 ---
 
@@ -22,6 +22,7 @@
 | Timezone | `America/New_York` |
 | Trigger | 3am cleanup — Day timer, 3–4am, GMT-4 |
 | Production URL | `https://script.google.com/macros/s/AKfycbwbxtLqIOT17tzeKTY9GNIiWqKgRgKiJD8CY54oWB5BBCCoEdszaICT75vDqJbRzRprxA/exec` |
+| Current version | @45 |
 | Test/Dev URL | `https://script.google.com/macros/s/AKfycbxZoPeIZsX6s7g9g2Ek6n9lJpGFkaByLiYTbgz2vb5Y/dev` |
 
 ---

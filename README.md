@@ -8,8 +8,8 @@ A personal daily task management PWA built on Google Apps Script + Google Sheets
 
 | Field | Value |
 |---|---|
-| Last updated | 2026-06-15 |
-| App version | WebApp.gs v7.3 / index.html v7.3 |
+| Last updated | 2026-06-17 |
+| App version | WebApp.gs v7.4 / index.html v7.4 |
 | Deployment | Live — Google Apps Script Web App |
 | Platform | PWA, added to phone home screen |
 

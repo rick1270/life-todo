@@ -1,5 +1,22 @@
 # Task Tracker Changelog
 
+## Session 2026-06-17
+
+### Changes
+- `index.html`: `submitCheckin()` now calls `sendToSheet(taskId,'Completed')` after `logCheckin` succeeds
+  - Was: check-in written to Check-ins tab only; `getCompletions` (which reads Completions tab) never saw it as done
+  - Fix: completion row written so task stays done across page reloads
+- `WebApp.js`: `addTaskNote()` now stores `created_at` as a native `Date` object instead of a formatted string
+  - Was: `Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm')` stored a string; Apps Script `new Date("2026-06-04 21:37")` may return `Invalid Date` on read-back
+  - Fix: `new Date()` stored directly — Sheets saves it as a Date cell, `getValues()` returns a proper Date object
+- `WebApp.js`: `getTaskNotes()` `created_at` handling now robust against bad formats
+  - Added `instanceof Date` check, ISO T-separator fallback, and `isNaN` guard
+  - A single bad `created_at` value no longer throws and silently empties the entire notes list
+
+### Decisions
+- `clasp deploy --deploymentId <ID>` can update production directly without the Apps Script UI; no longer need to go through Manage Deployments manually
+- Deployed as @45
+
 ## Session 2026-06-15 (continued)
 
 ### Changes
