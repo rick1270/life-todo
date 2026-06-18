@@ -1,5 +1,18 @@
 # Task Tracker Changelog
 
+## Session 2026-06-18
+
+### Changes
+- `WebApp.js`: split `gatherAndClearTaskNotes` into `gatherTaskNotes` (reads only) and `clearNotesForTask` (deletes rows)
+  - Was: notes deleted from Task Notes tab the moment a task was marked Completed → if user unchecked, notes were gone permanently
+  - Fix: `logCompletion` still copies note text into the Completions row, but Task Notes rows are NOT deleted on check-off
+  - `midnightCleanup` now calls `clearNotesForTask` at 3am for each task whose final status was Completed or Free-rolled
+  - Notes survive check→uncheck→recheck cycles within the day; only cleared at 3am when the day closes
+
+### Decisions
+- Notes should be cleared at 3am (end of day), not at the moment of completion — this was the original design intent in CLAUDE.md ("`cleared_at` set by 3am cleanup script on completion") but was implemented incorrectly
+- Deployed as @47
+
 ## Session 2026-06-17
 
 ### Changes

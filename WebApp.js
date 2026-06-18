@@ -1,5 +1,5 @@
 // ============================================================
-// RICK'S TASK TRACKER — WebApp.gs v7.3
+// RICK'S TASK TRACKER — WebApp.gs v7.5
 // ============================================================
 // Changes in v6.6:
 // - dateToYMD() global helper added: extracts UTC date components from a Date object
@@ -391,7 +391,7 @@ function logCompletion(payload) {
   const lastId = lastRow > 1 ? sheet.getRange(lastRow, 1).getValue() : 'COMP_0000';
   const num = parseInt(String(lastId).replace('COMP_','')) + 1;
   const newId = 'COMP_' + String(num).padStart(4, '0');
-  const notesText = payload.status === 'Completed' ? gatherAndClearTaskNotes(ss, payload.task_id) : '';
+  const notesText = payload.status === 'Completed' ? gatherTaskNotes(ss, payload.task_id) : '';
   sheet.appendRow([
     newId,
     payload.task_id,
@@ -452,7 +452,7 @@ function addTaskNote(payload) {
   return { success: true, note_id: newId };
 }
 
-function gatherAndClearTaskNotes(ss, taskId) {
+function gatherTaskNotes(ss, taskId) {
   const sheet = ss.getSheetByName('Task Notes');
   if (!sheet || sheet.getLastRow() < 2) return '';
   const data = sheet.getDataRange().getValues();
@@ -460,17 +460,30 @@ function gatherAndClearTaskNotes(ss, taskId) {
   const col = {};
   headers.forEach((h, i) => col[h] = i);
   const noteTexts = [];
-  const rowsToDelete = [];
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][col['task_id']]) === String(taskId)) {
       noteTexts.push(String(data[i][col['note_text']] || ''));
+    }
+  }
+  return noteTexts.join('\n');
+}
+
+function clearNotesForTask(ss, taskId) {
+  const sheet = ss.getSheetByName('Task Notes');
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+  const rowsToDelete = [];
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col['task_id']]) === String(taskId)) {
       rowsToDelete.push(i + 1);
     }
   }
   for (let i = rowsToDelete.length - 1; i >= 0; i--) {
     sheet.deleteRow(rowsToDelete[i]);
   }
-  return noteTexts.join('\n');
 }
 
 // ── GET COMPLETIONS ───────────────────────────────────────────
@@ -717,6 +730,15 @@ function midnightCleanup() {
     newStart.setDate(newStart.getDate() + delayDays);
     const newStartStr = Utilities.formatDate(newStart, tz, 'yyyy-MM-dd');
     tasksSheet.getRange(i + 1, tCol['start_date'] + 1).setValue(newStartStr);
+  }
+
+  // Clear Task Notes for tasks that ended yesterday as Completed or Free-rolled.
+  // Done here (not in logCompletion) so notes survive if the user unchecks and rechecks.
+  const tasksToClean = Object.keys(completedYesterday).filter(
+    id => completedYesterday[id] === 'Completed' || completedYesterday[id] === 'Free-rolled'
+  );
+  for (const taskId of tasksToClean) {
+    clearNotesForTask(ss, taskId);
   }
 
   // Delete yesterday's [TaskAlarm] events and create today's

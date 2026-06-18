@@ -464,17 +464,23 @@ function getEffectiveTime(t){
   return t.time || '';
 }
 
+function doneOrder(t){var s=completions[t.id];return(s==='done'||s==='cancelled')?1:0;}
+
 function renderToday(){
   var allTasks=todayTasks();
 
   // Split into scheduled vs anytime using effective time
+  // Within each section: incomplete first, done/cancelled last
   var scheduled=allTasks.filter(function(t){
     return getEffectiveTime(t).trim() !== '';
   }).sort(function(a,b){
-    return toMin(getEffectiveTime(a)) - toMin(getEffectiveTime(b));
+    var d=doneOrder(a)-doneOrder(b);
+    return d!==0?d:toMin(getEffectiveTime(a))-toMin(getEffectiveTime(b));
   });
   var anytime=allTasks.filter(function(t){
     return getEffectiveTime(t).trim() === '';
+  }).sort(function(a,b){
+    return doneOrder(a)-doneOrder(b);
   });
 
   // Progress bar: only tasks with counts_toward_rate=TRUE
