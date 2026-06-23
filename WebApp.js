@@ -925,24 +925,27 @@ function isTaskScheduledOnDate(r, tCol, date) {
   const endVal   = r[tCol['end_date']];
   const startStr = startVal instanceof Date ? dateToYMD(startVal) : String(startVal || '');
   const endStr   = endVal   instanceof Date ? dateToYMD(endVal)   : String(endVal   || '');
-  const start = startStr ? new Date(startStr + 'T12:00:00') : null;
-  const end   = endStr   ? new Date(endStr   + 'T12:00:00') : null;
 
-  if (start && date < start) return false;
-  if (end   && date > end)   return false;
+  // Use ET date strings for all comparisons — avoids datetime vs. noon mismatch when
+  // 'date' is 3am ET (7am UTC) but start/end are built as noon UTC.
+  const dateDayStr = Utilities.formatDate(date, TZ, 'yyyy-MM-dd');
+
+  if (startStr && dateDayStr < startStr) return false;
+  if (endStr   && dateDayStr > endStr)   return false;
 
   if (repeat === 'Daily') return true;
   if (repeat === 'Weekly') {
     const dayList = days.split(',').map(s => s.trim());
     if (dayList.indexOf(dayName) === -1) return false;
-    if (freq <= 1 || !start) return true;
-    const weeksDiff = Math.floor((date - start) / (7*24*60*60*1000));
+    if (freq <= 1 || !startStr) return true;
+    // Normalize both to noon for consistent week-diff arithmetic
+    const start    = new Date(startStr   + 'T12:00:00');
+    const dateNoon = new Date(dateDayStr + 'T12:00:00');
+    const weeksDiff = Math.floor((dateNoon - start) / (7*24*60*60*1000));
     return weeksDiff % freq === 0;
   }
-  if (repeat === 'One-time') {
-    return start && Utilities.formatDate(start, TZ, 'yyyy-MM-dd') === Utilities.formatDate(date, TZ, 'yyyy-MM-dd');
-  }
-  if (repeat === 'Self-Contingent') return start ? date >= start : true;
+  if (repeat === 'One-time') return startStr === dateDayStr;
+  if (repeat === 'Self-Contingent') return startStr ? dateDayStr >= startStr : true;
   return false;
 }
 

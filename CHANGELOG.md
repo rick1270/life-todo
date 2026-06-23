@@ -1,5 +1,18 @@
 # Task Tracker Changelog
 
+## Session 2026-06-23
+
+### Changes
+- `WebApp.js` v7.6: fixed `isTaskScheduledOnDate` date range check
+  - Was: `if (start && date < start) return false` — `start` is noon UTC; `date` (yesterday at 3am cleanup) is 7am UTC (3am ET); 7am < noon → One-time tasks incorrectly returned `false` on their own start date
+  - Fix: convert `date` to an ET date string (`dateDayStr`) via `Utilities.formatDate(date, TZ, 'yyyy-MM-dd')` and compare strings throughout — no datetime arithmetic for range checks
+  - Also simplified: One-time now `startStr === dateDayStr`; Self-Contingent now `dateDayStr >= startStr`; weekly freq calc normalizes both sides to noon
+  - Root effect: One-time tasks were never detected as scheduled on their start date → never marked Missed → `start_date` never advanced → task vanished after its original start date
+
+### Decisions
+- All date range comparisons in Apps Script should use ET date strings, never datetime `<`/`>` comparisons, to avoid the 3am-ET-vs-noon-UTC mismatch
+- Deployed as @48
+
 ## Session 2026-06-18
 
 ### Changes
