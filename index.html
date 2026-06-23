@@ -801,8 +801,9 @@ function sendToSheet(taskId,status){
   if (status==='Completed') countedInRate = task.counts_toward_rate !== false && task.type !== 'Check-in' && task.type !== 'Free-roll';
 
   writeStatuses[taskId]='Saving...';render();
+  var scheduledDate=toLocalDateStr(getViewDate());
   callSheet({action:'logCompletion',task_id:taskId,task_name:task.name,task_type:task.type||'Flexible',
-    scheduled_date:toLocalDateStr(getViewDate()),completed_at:new Date().toLocaleString('en-US'),
+    scheduled_date:scheduledDate,completed_at:new Date().toLocaleString('en-US'),
     status:status,counted_in_rate:countedInRate
   }).then(function(r){writeStatuses[taskId]=r.success?'Saved':'Saved locally';render();});
 }

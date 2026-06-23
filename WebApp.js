@@ -77,6 +77,7 @@ function doGet(e) {
       else if (payload.action === 'addTaskNote')     result = addTaskNote(payload);
       else if (payload.action === 'getGoalProgress') result = getGoalProgress();
       else if (payload.action === 'logGoalEntry')    result = logGoalEntry(payload);
+      else if (payload.action === 'cancelAlarm')     result = cancelAlarm(payload);
       else if (payload.action === 'ping')            result = { success: true };
       else result = { success: false, error: 'Unknown action' };
       return jsonResponse(result);
@@ -338,6 +339,22 @@ function createAlarmEvent(t) {
   cal.createEvent('[TaskAlarm] ' + t.name, start, end, { popupMinutes: reminderMin });
 }
 
+function cancelAlarm(payload) {
+  const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+  if (!cal) return { success: false, error: 'Calendar not found' };
+  const dateStr = payload.scheduled_date || Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  const dp = dateStr.split('-');
+  const dayStart = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]), 0, 0, 0);
+  const dayEnd   = new Date(parseInt(dp[0]), parseInt(dp[1])-1, parseInt(dp[2]), 23, 59, 59);
+  const title = '[TaskAlarm] ' + payload.task_name;
+  const events = cal.getEvents(dayStart, dayEnd);
+  let deleted = 0;
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].getTitle() === title) { events[i].deleteEvent(); deleted++; }
+  }
+  return { success: true, deleted };
+}
+
 // ── GET RULES ─────────────────────────────────────────────────
 function getRules() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -408,6 +425,9 @@ function logCompletion(payload) {
     payload.status,
     payload.counted_in_rate ? 'TRUE' : 'FALSE'
   ]);
+  if (payload.status === 'Completed' || payload.status === 'Cancelled') {
+    try { cancelAlarm({ task_name: payload.task_name, scheduled_date: payload.scheduled_date }); } catch(e) {}
+  }
   return { success: true, completion_id: newId };
 }
 
