@@ -468,27 +468,26 @@ function doneOrder(t){var s=completions[t.id];return(s==='done'||s==='cancelled'
 
 function renderToday(){
   var allTasks=todayTasks();
+  var isDone=function(t){var s=completions[t.id];return s==='done'||s==='cancelled';};
 
-  // Split into scheduled vs anytime using effective time
-  // Within each section: incomplete first, done/cancelled last
-  var scheduled=allTasks.filter(function(t){
-    return getEffectiveTime(t).trim() !== '';
-  }).sort(function(a,b){
-    var d=doneOrder(a)-doneOrder(b);
-    return d!==0?d:toMin(getEffectiveTime(a))-toMin(getEffectiveTime(b));
-  });
-  var anytime=allTasks.filter(function(t){
-    return getEffectiveTime(t).trim() === '';
-  }).sort(function(a,b){
-    return doneOrder(a)-doneOrder(b);
-  });
+  // Active tasks (incomplete): scheduled by time, then anytime
+  var activeScheduled=allTasks.filter(function(t){return !isDone(t)&&getEffectiveTime(t).trim()!=='';})
+    .sort(function(a,b){return toMin(getEffectiveTime(a))-toMin(getEffectiveTime(b));});
+  var activeAnytime=allTasks.filter(function(t){return !isDone(t)&&getEffectiveTime(t).trim()==='';});
+
+  // Done tasks (completed/cancelled): sorted by original scheduled_time
+  var doneTasks=allTasks.filter(isDone)
+    .sort(function(a,b){
+      var at=a.time?toMin(a.time):9999, bt=b.time?toMin(b.time):9999;
+      return at-bt;
+    });
 
   // Progress bar: only tasks with counts_toward_rate=TRUE
   // Free-roll = done visually but counted_in_rate=FALSE, so excluded from total
   var total=0, done=0;
   allTasks.forEach(function(t){
     if (t.type==='Check-in') return;
-    if (t.type==='Free-roll') return; // never counts
+    if (t.type==='Free-roll') return;
     if (t.counts_toward_rate===false) return;
     total++;
     if (completions[t.id]==='done') done++;
@@ -500,9 +499,10 @@ function renderToday(){
   document.getElementById('pbar').style.width=pct+'%';
 
   var html='';
-  if (scheduled.length){html+='<div class="section-header">Scheduled</div>';scheduled.forEach(function(t){html+=renderTask(t);});}
-  if (anytime.length){html+='<div class="section-header">Anytime</div>';anytime.forEach(function(t){html+=renderTask(t);});}
-  if (!html) html='<div style="text-align:center;color:#aaa;font-size:13px;padding:30px">No tasks today</div>';
+  if (activeScheduled.length){html+='<div class="section-header">Scheduled</div>';activeScheduled.forEach(function(t){html+=renderTask(t);});}
+  if (activeAnytime.length){html+='<div class="section-header">Anytime</div>';activeAnytime.forEach(function(t){html+=renderTask(t);});}
+  if (!activeScheduled.length&&!activeAnytime.length&&!doneTasks.length) html='<div style="text-align:center;color:#aaa;font-size:13px;padding:30px">No tasks today</div>';
+  if (doneTasks.length){html+='<div class="section-header">Done</div>';doneTasks.forEach(function(t){html+=renderTask(t);});}
   document.getElementById('task-list').innerHTML=html;
 }
 

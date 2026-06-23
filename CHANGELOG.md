@@ -2,6 +2,15 @@
 
 ## Session 2026-06-23
 
+### Changes (continued)
+- `index.html`: `renderToday` restructured — completed/cancelled tasks now sink to a "Done" section at the bottom
+  - Was: done tasks sorted within Scheduled/Anytime sections (incomplete first, but sections stayed fixed)
+  - Now: active tasks in Scheduled and Anytime sections at top; all done/cancelled tasks in a single "Done" section at the bottom
+  - Free-roll, cancel, check-in complete — all paths set `completions[id]` to `'done'` or `'cancelled'`, correctly caught by new `isDone` filter
+  - Deployed as @49
+
+## Session 2026-06-23 (rollover fix)
+
 ### Changes
 - `WebApp.js` v7.6: fixed `isTaskScheduledOnDate` date range check
   - Was: `if (start && date < start) return false` — `start` is noon UTC; `date` (yesterday at 3am cleanup) is 7am UTC (3am ET); 7am < noon → One-time tasks incorrectly returned `false` on their own start date
