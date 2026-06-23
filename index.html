@@ -72,6 +72,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .action-btn.muted { color: #555; background: #f0f0ea; }
 .action-btn.freeroll { color: #7A4F00; background: #FEF3E2; }
 .confirm-cancel-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; padding: 8px 10px; background: #FCEBEB; border-radius: 8px; }
+.goal-chip { min-width: 40px; height: 40px; border-radius: 10px; background: #E8F0FF; color: #2255AA; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-align: center; line-height: 1.2; padding: 2px; }
+.goal-chip.met { background: #E1F5EE; color: #085041; }
+.goal-bar-wrap { height: 3px; background: #E5E5E0; border-radius: 2px; margin-top: 4px; overflow: hidden; }
+.goal-bar { height: 100%; background: #2255AA; border-radius: 2px; transition: width 0.3s; }
+.goal-log-row { display: flex; gap: 8px; align-items: center; padding: 6px 0 2px; }
+.goal-log-input { width: 64px; border: 1px solid #ddd; border-radius: 8px; padding: 7px 8px; font-size: 16px; text-align: center; background: #fff; color: #111; outline: none; }
+.goal-log-btn { background: #2255AA; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .checkin-body { border-top: 1px solid #f0f0ea; padding: 12px 14px; background: #fafaf7; }
 .q-block { margin-bottom: 14px; }
 .q-label { font-size: 13px; color: #555; margin-bottom: 6px; }
@@ -182,6 +189,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <option value="Weekly">Weekly</option>
           <option value="One-time" selected>One-time</option>
           <option value="Self-Contingent">Self-Contingent</option>
+          <option value="Cumulative">Cumulative (goal)</option>
         </select>
       </div>
     </div>
@@ -233,6 +241,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <label>Instructions (optional)</label>
       <input type="text" id="new-notes" placeholder="e.g. Take with food">
     </div>
+    <div class="field" id="goal-count-field" style="display:none">
+      <label>Goal total <span class="req">*</span></label>
+      <input type="number" id="new-goal-count" min="1" placeholder="e.g. 7">
+    </div>
     <div class="field-row" id="contingent-delay-fields" style="display:none">
       <div class="field">
         <label>Delay</label>
@@ -270,7 +282,7 @@ function toLocalDateStr(d) {
     + String(d.getDate()).padStart(2,'0');
 }
 
-var offsetDays=0, expanded={}, completions={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
+var offsetDays=0, expanded={}, completions={}, goalProgress={}, checkinAnswers={}, checkinSubmitted={}, writeStatuses={}, pendingCancel={};
 var editingTaskId=null;
 var taskNotes={}, notesLoading={}, noteInputs={};
 var completionTimes={}; // taskId → Date object of when task was completed
@@ -296,12 +308,14 @@ function loadAll() {
     callSheet({action:'getTasks'}),
     callSheet({action:'getRules'}),
     callSheet({action:'getQuestions'}),
-    callSheet({action:'getCompletions',date:today})
+    callSheet({action:'getCompletions',date:today}),
+    callSheet({action:'getGoalProgress'})
   ]).then(function(results){
     if (results[0].success) TASKS=results[0].tasks;
     if (results[1].success) rules=results[1].rules;
     if (results[2].success) questions=results[2].questions;
     if (results[3].success) completions=results[3].completions;
+    if (results[4].success) goalProgress=results[4].progress||{};
     document.getElementById('sync-msg').textContent='Ready';
     render();
   }).catch(function(){
@@ -358,6 +372,7 @@ function isTaskOnDay(t,d){
   }
   if (t.repeat==='One-time'){var sd=parseDate(t.start_date);return sd&&sd.toDateString()===d.toDateString();}
   if (t.repeat==='Self-Contingent'){var sc=parseDate(t.start_date);return !sc||d>=sc;}
+  if (t.repeat==='Cumulative') return true;
   return false;
 }
 
@@ -447,6 +462,7 @@ function cadenceText(t){
   }
   if (t.repeat==='One-time') return 'One-time';
   if (t.repeat==='Self-Contingent') return (t.instructions?t.instructions+' — ':'')+'after completion';
+  if (t.repeat==='Cumulative') return 'Goal: '+(goalProgress[t.id]||0)+' of '+t.goal_count;
   return '';
 }
 
@@ -468,7 +484,10 @@ function doneOrder(t){var s=completions[t.id];return(s==='done'||s==='cancelled'
 
 function renderToday(){
   var allTasks=todayTasks();
-  var isDone=function(t){var s=completions[t.id];return s==='done'||s==='cancelled';};
+  var isDone=function(t){
+    if (t.repeat==='Cumulative') return t.goal_count>0&&(goalProgress[t.id]||0)>=t.goal_count;
+    var s=completions[t.id];return s==='done'||s==='cancelled';
+  };
 
   // Active tasks (incomplete): scheduled by time, then anytime
   var activeScheduled=allTasks.filter(function(t){return !isDone(t)&&getEffectiveTime(t).trim()!=='';})
@@ -599,6 +618,33 @@ function renderTask(t){
         +'</div>';
     }
   }
+  // Cumulative (goal) tasks: progress chip + log entry, no checkbox
+  if (t.repeat==='Cumulative') {
+    var prog=goalProgress[t.id]||0, goal=t.goal_count||0;
+    var pct=goal>0?Math.min(100,Math.round(prog/goal*100)):0;
+    var goalMet=goal>0&&prog>=goal;
+    var chip='<div class="goal-chip'+(goalMet?' met':'')+'">'+( goalMet?'✓':prog+'<br>/'+goal)+'</div>';
+    var bar=goal>0?'<div class="goal-bar-wrap"><div class="goal-bar" style="width:'+pct+'%"></div></div>':'';
+    var goalExp='';
+    if (isExp) {
+      goalExp='<div class="task-expanded">'
+        +(t.instructions?'<div class="notes-section"><div class="notes-label">Instructions</div><div class="task-note-text">'+escapeHtml(t.instructions)+'</div></div>':'')
+        +'<div class="goal-log-row">'
+        +'<input class="goal-log-input" id="goal-input-'+t.id+'" type="number" min="1" value="1" onclick="event.stopPropagation()">'
+        +'<button class="goal-log-btn" onclick="event.stopPropagation();logGoalEntry(\''+t.id+'\')">Log</button>'
+        +(goalMet?'<span style="font-size:12px;color:#1D9E75;font-weight:600">Goal met!</span>':'')
+        +'</div>'
+        +(ws?'<div class="write-status">'+ws+'</div>':'')
+        +'</div>';
+    }
+    return '<div class="task-card'+(goalMet?' done':'')+'" id="card-'+t.id+'">'
+      +'<div class="task-row" onclick="toggleExpand(\''+t.id+'\')">'
+      +chip
+      +'<div class="task-info"><div class="task-name">'+t.name+'</div><div class="task-meta-row">'+meta+'</div>'+bar+'</div>'
+      +'<span class="expand-arrow '+(isExp?'open':'')+'">&#9660;</span>'
+      +'</div>'+goalExp+'</div>';
+  }
+
   return '<div class="task-card '+aptClass+(isDone?' done':isCancelled?' cancelled':'')+'" id="card-'+t.id+'">'
     +'<div class="task-row" onclick="toggleExpand(\''+t.id+'\')">'
     +'<div class="check-box '+(isDone?'checked':isCancelled?'cancelled-box':'')+'" onclick="event.stopPropagation();quickDone(\''+t.id+'\')"></div>'
@@ -726,6 +772,22 @@ function markDone(id){completions[id]='done';completionTimes[id]=new Date();expa
 function markCancelled(id){completions[id]='cancelled';expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Cancelled');render();}
 function markFreeRoll(id){completions[id]='done';completionTimes[id]=new Date();expanded[id]=false;pendingCancel[id]=null;sendToSheet(id,'Free-rolled');render();}
 
+function logGoalEntry(id){
+  var input=document.getElementById('goal-input-'+id);
+  var count=parseInt(input?input.value:1)||1;
+  writeStatuses[id]='Logging '+count+'...';
+  render();
+  callSheet({action:'logGoalEntry',task_id:id,count:count,logged_date:toLocalDateStr(getViewDate())}).then(function(r){
+    if (r.success){
+      goalProgress[id]=r.total;
+      writeStatuses[id]='Logged '+count+' — total: '+r.total+(r.total>=(TASKS.find(function(t){return t.id===id;})||{goal_count:0}).goal_count?' ✓ Goal met!':'');
+    } else {
+      writeStatuses[id]='Error logging';
+    }
+    render();
+  });
+}
+
 function sendToSheet(taskId,status){
   var task=null;
   for (var i=0;i<TASKS.length;i++){if(TASKS[i].id===taskId){task=TASKS[i];break;}}
@@ -783,6 +845,7 @@ function updateModalFields(){
   document.getElementById('days-field').classList.toggle('field-disabled',!isWeekly);
   document.getElementById('freq-field').classList.toggle('field-disabled',!isWeekly);
   document.getElementById('contingent-delay-fields').style.display=rep==='Self-Contingent'?'':'none';
+  document.getElementById('goal-count-field').style.display=rep==='Cumulative'?'':'none';
 }
 
 function toggleDay(btn){
@@ -810,6 +873,7 @@ function openModal(){
   document.getElementById('new-calendar').checked=false;
   document.getElementById('new-contingent-delay').value='';
   document.getElementById('new-contingent-unit').value='Days';
+  document.getElementById('new-goal-count').value='';
   selectedDays=[];
   document.querySelectorAll('.day-btn').forEach(function(b){b.classList.remove('sel');});
   updateModalFields();
@@ -835,6 +899,7 @@ function openEditModal(id){
   document.getElementById('new-notes').value=t.instructions||'';
   document.getElementById('new-contingent-delay').value=t.contingent_delay||'';
   document.getElementById('new-contingent-unit').value=t.contingent_delay_unit||'Days';
+  document.getElementById('new-goal-count').value=t.goal_count||'';
   selectedDays=t.days?t.days.split(',').map(function(d){return d.trim();}):[];
   document.querySelectorAll('.day-btn').forEach(function(b){
     b.classList.toggle('sel',selectedDays.indexOf(b.dataset.day)>-1);
@@ -865,7 +930,8 @@ function saveNewTask(){
     add_to_calendar:document.getElementById('new-calendar').checked,
     contingent_on:conOn,
     contingent_delay:document.getElementById('new-contingent-delay').value,
-    contingent_delay_unit:document.getElementById('new-contingent-unit').value
+    contingent_delay_unit:document.getElementById('new-contingent-unit').value,
+    goal_count:parseInt(document.getElementById('new-goal-count').value)||0
   };
   if (editingTaskId) payload.task_id=editingTaskId;
   closeModal();

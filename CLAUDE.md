@@ -22,7 +22,7 @@
 | Timezone | `America/New_York` |
 | Trigger | 3am cleanup — Day timer, 3–4am, GMT-4 |
 | Production URL | `https://script.google.com/macros/s/AKfycbwbxtLqIOT17tzeKTY9GNIiWqKgRgKiJD8CY54oWB5BBCCoEdszaICT75vDqJbRzRprxA/exec` |
-| Current version | @49 |
+| Current version | @50 |
 | Test/Dev URL | `https://script.google.com/macros/s/AKfycbxZoPeIZsX6s7g9g2Ek6n9lJpGFkaByLiYTbgz2vb5Y/dev` |
 
 ---

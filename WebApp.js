@@ -75,6 +75,8 @@ function doGet(e) {
       else if (payload.action === 'cancelSeries')    result = cancelSeries(payload);
       else if (payload.action === 'getTaskNotes')    result = getTaskNotes(payload);
       else if (payload.action === 'addTaskNote')     result = addTaskNote(payload);
+      else if (payload.action === 'getGoalProgress') result = getGoalProgress();
+      else if (payload.action === 'logGoalEntry')    result = logGoalEntry(payload);
       else if (payload.action === 'ping')            result = { success: true };
       else result = { success: false, error: 'Unknown action' };
       return jsonResponse(result);
@@ -142,7 +144,8 @@ function getTasks() {
       counts_toward_rate: String(r[col['counts_toward_rate']]).toUpperCase() === 'TRUE',
       rollover:         rollover,
       reminder_minutes: r[col['reminder_minutes']] || '',
-      instructions:     r[col['notes']] || ''
+      instructions:     r[col['notes']] || '',
+      goal_count:       col['goal_count'] !== undefined ? (parseInt(r[col['goal_count']]) || 0) : 0
     });
   }
   return { success: true, tasks: tasks };
@@ -190,6 +193,7 @@ function addTask(payload) {
   row[col['reminder_minutes']]      = payload.reminder_minutes || '';
   row[col['active']]                = 'TRUE';
   row[col['notes']]                 = payload.note || '';
+  if (col['goal_count'] !== undefined) row[col['goal_count']] = parseInt(payload.goal_count) || 0;
 
   sheet.appendRow(row);
 
@@ -260,7 +264,8 @@ function updateTask(payload) {
       counts_toward_rate:    payload.type === 'Check-in' ? 'FALSE' : 'TRUE',
       rollover:              rollover ? 'TRUE' : 'FALSE',
       reminder_minutes:      payload.reminder_minutes || '',
-      notes:                 payload.note || ''
+      notes:                 payload.note || '',
+      goal_count:            parseInt(payload.goal_count) || 0
     };
 
     Object.keys(updates).forEach(function(field) {
@@ -574,6 +579,65 @@ function cancelSeries(payload) {
   return { success: false, error: 'Task not found' };
 }
 
+// ── CUMULATIVE GOAL TRACKING ──────────────────────────────────
+function getGoalProgress() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Goal Log');
+  if (!sheet) return { success: true, progress: {} };
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, progress: {} };
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+  const progress = {};
+  for (let i = 1; i < data.length; i++) {
+    const tid = String(data[i][col['task_id']] || '');
+    const cnt = parseInt(data[i][col['count']]) || 0;
+    if (!tid) continue;
+    progress[tid] = (progress[tid] || 0) + cnt;
+  }
+  return { success: true, progress };
+}
+
+function logGoalEntry(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Goal Log');
+  if (!sheet) {
+    sheet = ss.insertSheet('Goal Log');
+    sheet.appendRow(['log_id', 'task_id', 'count', 'logged_date', 'logged_at']);
+  }
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => col[h] = i);
+
+  const taskId = String(payload.task_id || '');
+  const count = parseInt(payload.count) || 1;
+  const loggedDate = String(payload.logged_date || Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'));
+  const loggedAt = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss');
+
+  // Generate log_id
+  let maxNum = 0;
+  for (let i = 1; i < data.length; i++) {
+    const id = String(data[i][col['log_id']] || '');
+    const m = id.match(/^LOG_(\d+)$/);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+  }
+  const logId = 'LOG_' + String(maxNum + 1).padStart(3, '0');
+
+  sheet.appendRow([logId, taskId, count, loggedDate, loggedAt]);
+
+  // Sum total for this task
+  const allData = sheet.getDataRange().getValues();
+  let total = 0;
+  for (let i = 1; i < allData.length; i++) {
+    if (String(allData[i][col['task_id']]) === taskId) {
+      total += parseInt(allData[i][col['count']]) || 0;
+    }
+  }
+  return { success: true, total };
+}
+
 // ── 3AM CLEANUP ───────────────────────────────────────────────
 // Runs daily at 3am via Apps Script time-driven trigger
 function midnightCleanup() {
@@ -672,6 +736,7 @@ function midnightCleanup() {
     if (!wasScheduled) continue;
 
     if (taskType === 'Check-in') { checkins++; continue; }
+    if (repeat === 'Cumulative') continue;
     scheduled++;
 
     const status = completedYesterday[taskId];
@@ -946,6 +1011,7 @@ function isTaskScheduledOnDate(r, tCol, date) {
   }
   if (repeat === 'One-time') return startStr === dateDayStr;
   if (repeat === 'Self-Contingent') return startStr ? dateDayStr >= startStr : true;
+  if (repeat === 'Cumulative') return true;
   return false;
 }
 

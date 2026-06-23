@@ -1,6 +1,25 @@
 # Task Tracker Changelog
 
-## Session 2026-06-23
+## Session 2026-06-23 (continued — Cumulative goals)
+
+### Changes
+- `WebApp.js`: added `getGoalProgress()` — reads Goal Log tab, returns `{task_id: total}` object
+- `WebApp.js`: added `logGoalEntry(payload)` — auto-creates Goal Log tab if missing, appends a row, returns running total
+- `WebApp.js`: `isTaskScheduledOnDate` — added `Cumulative` case (always returns true)
+- `WebApp.js`: `midnightCleanup` — Cumulative tasks skip the scheduled/missed accounting loop (never marked Missed)
+- `index.html`: Cumulative task rendering — progress chip, progress bar, log entry panel with number input and Log button
+- `index.html`: `logGoalEntry(id)` — calls `logGoalEntry` action, updates `goalProgress` in memory, re-renders
+- `index.html`: `loadAll` — fetches `getGoalProgress` alongside other data; `isTaskOnDay` returns true for Cumulative
+- `index.html`: Add Task / Edit Task modals — Cumulative option in repeat dropdown, goal_count field
+- Deployed as @50
+
+### Decisions
+- Goal Log is cumulative — never resets, tracks total across all time until end_date
+- Multiple entries per day allowed (e.g., log 1 in morning, 2 at night)
+- Task stays visible and active until end_date; goal_count is the display target, not a hard stop
+- Goal Log tab auto-created by `logGoalEntry` if it doesn't exist yet
+
+## Session 2026-06-23 (Done section)
 
 ### Changes (continued)
 - `index.html`: `renderToday` restructured — completed/cancelled tasks now sink to a "Done" section at the bottom
